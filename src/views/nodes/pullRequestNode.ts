@@ -29,7 +29,6 @@ import { createViewDecorationUri } from '../viewDecorationProvider.js';
 import { CacheableChildrenViewNode } from './abstract/cacheableChildrenViewNode.js';
 import type { ClipboardType, ViewNode } from './abstract/viewNode.js';
 import { ContextValues, getViewNodeId } from './abstract/viewNode.js';
-import { CodeSuggestionsNode } from './codeSuggestionsNode.js';
 import { CommandMessageNode, MessageNode } from './common.js';
 import { ResultsCommitsNode } from './resultsCommitsNode.js';
 import { ResultsFilesNode } from './resultsFilesNode.js';
@@ -96,6 +95,7 @@ export class PullRequestNode extends CacheableChildrenViewNode<'pullrequest', Vi
 				remote: true,
 			};
 		}
+
 		return undefined;
 	}
 
@@ -109,6 +109,7 @@ export class PullRequestNode extends CacheableChildrenViewNode<'pullrequest', Vi
 				remote: true,
 			};
 		}
+
 		return undefined;
 	}
 
@@ -117,6 +118,7 @@ export class PullRequestNode extends CacheableChildrenViewNode<'pullrequest', Vi
 			const children = await getPullRequestChildren(this.view, this, this.pullRequest, this.repoPath);
 			this.children = children;
 		}
+
 		return this.children;
 	}
 
@@ -238,7 +240,6 @@ export async function getPullRequestChildren(
 				]),
 			},
 		),
-		new CodeSuggestionsNode(view, parent, repoPath, pullRequest),
 		new ResultsFilesNode(
 			view,
 			parent,

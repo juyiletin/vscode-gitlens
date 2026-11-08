@@ -51,7 +51,6 @@
 		"packages/plus/git-github/src/**/*",
 		"packages/plus/ai/src/**/*",
 		"packages/plus/agents/src/**/*",
-		"packages/plus/notifications/src/**/*",
 		"packages/plus/integrations/src/**/*"
 	],
 	"exclude": ["**/__tests__/**"]

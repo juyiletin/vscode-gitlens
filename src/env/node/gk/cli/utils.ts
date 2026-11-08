@@ -101,8 +101,11 @@ export function clearResolvedCLIExecutableCache(): void {
 	resolvedExecutablesCache.clear();
 }
 
-export function resolveCLIExecutable(cliPath?: string | null): Promise<Uri | undefined> {
-	const uri = getCLIExecutable(cliPath);
+export function resolveCLIExecutable(_cliPath?: string | null): Promise<Uri | undefined> {
+	const configuredPath = configuration.get('gitkraken.cli.localPath');
+	if (!configuredPath) return Promise.resolve(undefined);
+
+	const uri = Uri.file(configuredPath);
 	return resolvedExecutablesCache.getOrCreate(uri.toString(), async () => {
 		return (await exists(uri)) ? uri : undefined;
 	});

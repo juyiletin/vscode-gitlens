@@ -93,7 +93,7 @@ export class OpenRouterProvider extends OpenAICompatibleProviderBase<typeof prov
 		return {
 			Accept: 'application/json',
 			'Content-Type': 'application/json',
-			'HTTP-Referer': 'https://gitkraken.com/',
+			'HTTP-Referer': 'https://github.com/juyiletin/vscode-gitlens',
 			'X-Title': 'GitKraken',
 			Authorization: `Bearer ${apiKey}`,
 		};

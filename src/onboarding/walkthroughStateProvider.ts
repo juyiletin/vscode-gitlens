@@ -22,7 +22,7 @@ const triedProStates: Readonly<SubscriptionState[]> = [
 	SubscriptionState.Paid,
 ];
 
-const tryProCommands: Readonly<TrackedUsageKeys[]> = ['command:gitlens.plus.reactivateProTrial:executed'];
+const tryProCommands: Readonly<TrackedUsageKeys[]> = [];
 
 const walkthroughRequiredMapping: Readonly<Map<WalkthroughContextKeys, WalkthroughUsage>> = new Map<
 	WalkthroughContextKeys,
@@ -118,8 +118,6 @@ const walkthroughRequiredMapping: Readonly<Map<WalkthroughContextKeys, Walkthrou
 		'mcpFeatures',
 		{
 			usage: [
-				'command:gitlens.ai.mcp.install:executed',
-				'command:gitlens.ai.mcp.reinstall:executed',
 				'action:gitlens.mcp.ipcRequest:happened',
 				'action:gitlens.ai.openInAgent:happened',
 				'action:gitlens.mcp.bundledMcpDefinitionProvided:happened',
@@ -279,6 +277,7 @@ export class WalkthroughStateProvider implements Disposable {
 				shouldFire = true;
 			}
 		}
+
 		if (shouldFire) {
 			this._onDidChangeProgress.fire(undefined);
 		}
@@ -326,6 +325,7 @@ export class WalkthroughStateProvider implements Disposable {
 		for (const key of walkthroughRequiredMapping.keys()) {
 			state.set(key, this.completed.has(key));
 		}
+
 		return state;
 	}
 
@@ -342,6 +342,7 @@ export class WalkthroughStateProvider implements Disposable {
 		for (const key of graphWalkthroughRequiredMapping.keys()) {
 			state.set(key, this.graphCompleted.has(key));
 		}
+
 		return state;
 	}
 
@@ -384,6 +385,7 @@ export class WalkthroughStateProvider implements Disposable {
 				keys.push(key);
 			}
 		}
+
 		return keys;
 	}
 
@@ -395,6 +397,7 @@ export class WalkthroughStateProvider implements Disposable {
 		if (usage.length > 0 && !usage.some(event => this.container.usage.isUsed(event))) {
 			return false;
 		}
+
 		return true;
 	}
 
@@ -405,10 +408,12 @@ export class WalkthroughStateProvider implements Disposable {
 		if (subscriptionStates != null && subscriptionStates.length > 0) {
 			subscriptionState = this.subscriptionState != null && subscriptionStates.includes(this.subscriptionState);
 		}
+
 		let subscriptionCommandState: boolean | undefined;
 		if (subscriptionCommands != null && subscriptionCommands.length > 0) {
 			subscriptionCommandState = subscriptionCommands.some(event => this.container.usage.isUsed(event));
 		}
+
 		if (
 			(subscriptionState === undefined && subscriptionCommandState === false) ||
 			(subscriptionState === false && subscriptionCommandState !== true)
@@ -419,6 +424,7 @@ export class WalkthroughStateProvider implements Disposable {
 		if (usage.length > 0 && !usage.some(event => this.container.usage.isUsed(event))) {
 			return false;
 		}
+
 		return true;
 	}
 }

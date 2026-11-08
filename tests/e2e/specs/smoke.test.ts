@@ -93,7 +93,7 @@ test.describe('Smoke Tests — GitLens views', () => {
 		await vscode.gitlens.resetUI();
 	});
 
-	test('should show GitLens views (Community - without Pro subscription)', async ({ vscode }) => {
+	test('should show GitLens views with local Pro access and no account', async ({ vscode }) => {
 		await vscode.gitlens.showGitLensView();
 
 		// Click continue if present (it might be the welcome view)
@@ -117,12 +117,12 @@ test.describe('Smoke Tests — GitLens views', () => {
 			await vscode.gitlens.showCommitsView();
 			await expect(vscode.gitlens.sidebar.getTreeItem(/^Commits/i)).toBeVisible({ timeout: MaxTimeout });
 
-			// Worktrees view should show Pro gate for Community users (private repos)
+			// Worktrees are available immediately without signing in.
 			await vscode.gitlens.showWorktreesView();
-			// For Community users, expect the Pro trial prompt or unlock message
+			// Local Pro access must not show a trial prompt or unlock message.
 			const proTrialButton = vscode.page.getByRole('button', { name: /Try GitLens Pro/i });
 			const unlockMessage = vscode.page.getByText(/Unlock this feature/i);
-			await expect(proTrialButton.or(unlockMessage).first()).toBeVisible({ timeout: MaxTimeout });
+			await expect(proTrialButton.or(unlockMessage).first()).not.toBeVisible();
 
 			await vscode.gitlens.showBranchesView();
 			await expect(vscode.gitlens.sidebar.getTreeItem(/^Branches/i)).toBeVisible({ timeout: MaxTimeout });
@@ -141,13 +141,7 @@ test.describe('Smoke Tests — GitLens views', () => {
 		}
 	});
 
-	test('should show GitLens views (Pro - with simulated Pro subscription)', async ({ vscode }) => {
-		// Simulate a Pro subscription for this test
-		await using _ = await vscode.gitlens.startSubscriptionSimulation({
-			state: 6 /* SubscriptionState.Paid */,
-			planId: 'pro',
-		});
-
+	test('should show worktree content with local Pro access', async ({ vscode }) => {
 		await vscode.gitlens.showGitLensView();
 
 		// Click continue if present (it might be the welcome view)
@@ -266,7 +260,7 @@ test.describe('Smoke Tests — GitLens Inspect views', () => {
 		});
 	});
 
-	test('should show Visual File History view  (Community - without Pro subscription)', async ({ vscode }) => {
+	test('should show Visual File History with local Pro access and no account', async ({ vscode }) => {
 		// open the visual file history view
 		await vscode.gitlens.showVisualFileHistoryView();
 		await expect(vscode.gitlens.visualHistoryViewSection).toBeVisible({ timeout: MaxTimeout });
@@ -274,20 +268,14 @@ test.describe('Smoke Tests — GitLens Inspect views', () => {
 		const visualHistoryWebview = await vscode.gitlens.visualHistoryViewWebview;
 		expect(visualHistoryWebview).not.toBeNull();
 
-		// For Community users, expect the Pro gate (feature-gate component with Try GitLens Pro)
+		// Local Pro access must render history without a subscription gate.
 		const featureGate = visualHistoryWebview!.locator('gl-feature-gate');
 		const tryProButton = visualHistoryWebview!.getByRole('button', { name: /Try GitLens Pro/i });
-		// Could be "Try GitLens Pro" for Community, or the feature gate
-		await expect(featureGate.or(tryProButton).first()).toBeVisible({ timeout: MaxTimeout });
+		// Neither the gate nor its trial button should be visible.
+		await expect(featureGate.or(tryProButton).first()).not.toBeVisible();
 	});
 
-	test('should show Visual File History view (Pro - with simulated Pro subscription)', async ({ vscode }) => {
-		// Simulate a Pro subscription for this test
-		await using _ = await vscode.gitlens.startSubscriptionSimulation({
-			state: 6 /* SubscriptionState.Paid */,
-			planId: 'pro',
-		});
-
+	test('should render Visual File History content with local Pro access', async ({ vscode }) => {
 		// open the visual file history view
 		await vscode.gitlens.showVisualFileHistoryView();
 		await expect(vscode.gitlens.visualHistoryViewSection).toBeVisible({ timeout: MaxTimeout });
@@ -320,39 +308,17 @@ test.describe('Smoke Tests — Commit Graph view', () => {
 		await vscode.gitlens.resetUI();
 	});
 
-	test('should show commit graph gate (Community - without Pro subscription)', async ({ vscode }) => {
+	test('should show commit graph content with local Pro access and no account', async ({ vscode }) => {
 		await vscode.gitlens.showCommitGraphView();
-
 		await expect(vscode.gitlens.commitGraphViewSection).toBeVisible({ timeout: MaxTimeout });
-
-		// Use a longer timeout for webview discovery under parallel load
-		const graphWebview = await vscode.gitlens.getGitLensWebview('Graph', 'webviewView', 30000);
-		expect(graphWebview).not.toBeNull();
-
-		// A user without a Pro subscription is gated out of the graph. Depending on account state this
-		// is either the Pro feature-gate ("Try GitLens Pro" / "Continue") for a signed-in Community user,
-		// or — for a signed-out user (the harness default) — the account-access gate ("Get Started with
-		// GitLens" with "Create Free Account" / "Sign In"). Accept any of them.
-		// Match only a *visible* gate (`:not([hidden])`): a hidden `gl-feature-gate` can sit in the DOM
-		// ahead of the account-access affordances, and `.or(...).first()` would otherwise resolve to that
-		// hidden element and fail the visibility assertion even though a later alternative is showing.
-		const featureGate = graphWebview!.locator('gl-feature-gate:not([hidden])');
-		const tryProButton = graphWebview!.getByRole('button', { name: /Try GitLens Pro/i });
-		const continueButton = graphWebview!.getByRole('button', { name: /Continue/i });
-		const getStartedHeading = graphWebview!.getByRole('heading', { name: /Get Started with GitLens/i });
-		const accountLink = graphWebview!.getByRole('link', { name: /Create Free Account|Sign In/i });
-		await expect(
-			featureGate.or(tryProButton).or(continueButton).or(getStartedHeading).or(accountLink).first(),
-		).toBeVisible({ timeout: 30000 });
+		const graph = await vscode.gitlens.getGitLensWebview('Graph', 'webviewView', 30000);
+		expect(graph).not.toBeNull();
+		await expect(graph!.getByRole('tree', { name: 'Commit graph' })).toBeVisible({ timeout: MaxTimeout });
+		await expect(graph!.locator('gl-feature-gate:not([hidden])')).not.toBeVisible();
+		await expect(graph!.getByRole('link', { name: /Create Free Account|Sign In/i })).not.toBeVisible();
 	});
 
-	test('should show commit graph content (Pro - with simulated Pro subscription)', async ({ vscode }) => {
-		// Simulate a Pro subscription for this test
-		await using _ = await vscode.gitlens.startSubscriptionSimulation({
-			state: 6 /* SubscriptionState.Paid */,
-			planId: 'pro',
-		});
-
+	test('should render the commit graph with local Pro access', async ({ vscode }) => {
 		await vscode.gitlens.showCommitGraphView();
 
 		await expect(vscode.gitlens.commitGraphViewSection).toBeVisible({ timeout: MaxTimeout });

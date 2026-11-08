@@ -1,5 +1,4 @@
 import * as l10n from '@vscode/l10n';
-import { gitKrakenProviderDescriptor } from './constants.js';
 import type { AIModel } from './models/model.js';
 
 export const enum AIErrorReason {
@@ -23,9 +22,7 @@ export class AIError extends Error {
 	readonly diagnosticMessage: string;
 	readonly original?: Error;
 	readonly reason: AIErrorReason | undefined;
-	/** Optional provider context. Omitted preserves the legacy GitKraken quota message and credit offers, so a
-	 *  non-GitKraken provider must pass its own to get provider-neutral text (and no credit offers). Also names
-	 *  the provider in the model-unavailable message. */
+	/** Optional provider context. Names the provider in quota and model-unavailable messages. */
 	readonly provider?: AIModel['provider'];
 
 	constructor(reason: AIErrorReason, original?: Error, provider?: AIModel['provider']) {
@@ -43,7 +40,7 @@ export class AIError extends Error {
 			case AIErrorReason.UserQuotaExceeded:
 				diagnosticMessage = 'You have exceeded your user token limit';
 				message =
-					provider != null && provider.id !== gitKrakenProviderDescriptor.id
+					provider != null
 						? l10n.t(
 								'You’ve reached the AI usage limit for {0}. Check your plan and usage with {0}, or switch to a different provider.',
 								provider.name,
@@ -159,14 +156,17 @@ export function classifyNetworkError(ex: unknown): AIErrorReason.NoNetwork | AIE
 		if (current.name === 'TypeError' && current.message === 'fetch failed') {
 			sawFetchFailed = true;
 		}
+
 		const code = (current as { code?: unknown }).code;
 		if (typeof code === 'string') {
 			if (noNetworkErrorCodes.has(code)) return AIErrorReason.NoNetwork;
+
 			if (unreachableErrorCodes.has(code)) return AIErrorReason.Unreachable;
 		}
 
 		current = (current as { cause?: unknown }).cause;
 	}
+
 	return sawFetchFailed ? AIErrorReason.NoNetwork : undefined;
 }
 
@@ -184,6 +184,7 @@ export function classifyNetworkError(ex: unknown): AIErrorReason.NoNetwork | AIE
  */
 export function isAIUnavailableError(ex: unknown): ex is AIError | AuthenticationRequiredError {
 	if (ex instanceof AuthenticationRequiredError) return true;
+
 	if (!(ex instanceof AIError)) return false;
 
 	switch (ex.reason) {

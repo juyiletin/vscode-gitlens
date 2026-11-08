@@ -1187,6 +1187,7 @@ export class GlGraphAccessAccount extends SignalWatcher(LitElement) {
 	private get screen(): 'signin' | 'verify' | 'welcome' {
 		const account = this.graphState.subscription?.account;
 		if (account == null) return 'signin';
+
 		if (account.verified === false) return 'verify';
 
 		return this.welcome ? 'welcome' : 'verify';
@@ -1211,6 +1212,7 @@ export class GlGraphAccessAccount extends SignalWatcher(LitElement) {
 				this._slideIndex = 0;
 			}
 		}
+
 		this._lastScreen = screen;
 
 		if (screen === 'signin' && !this.introVideo && this._stripInterval == null) {
@@ -1492,7 +1494,7 @@ export class GlGraphAccessAccount extends SignalWatcher(LitElement) {
 			<div class="actions">
 				<gl-button
 					full
-					href=${createCommandLink<SubscriptionLoginCommandArgs>('gitlens.plus.signUp', {
+					href=${createCommandLink<SubscriptionLoginCommandArgs>('gitlens.showSettingsPage!account', {
 						...this.signInSource,
 						openAccountView: false,
 					})}
@@ -1502,7 +1504,7 @@ export class GlGraphAccessAccount extends SignalWatcher(LitElement) {
 				<gl-button
 					full
 					appearance="secondary"
-					href=${createCommandLink<SubscriptionLoginCommandArgs>('gitlens.plus.login', {
+					href=${createCommandLink<SubscriptionLoginCommandArgs>('gitlens.showSettingsPage!account', {
 						...this.signInSource,
 						openAccountView: false,
 					})}

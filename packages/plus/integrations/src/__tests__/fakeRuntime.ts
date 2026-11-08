@@ -11,10 +11,20 @@
 //
 // This file lives in the package's own __tests__/ tree so tests are
 // runtime-pure (no VS Code, no `Container`).
-
-import type { Event } from '@gitlens/utils/event.js';
 import { Emitter } from '@gitlens/utils/event.js';
-import type { Uri } from '@gitlens/utils/uri.js';
+// Minimal `IntegrationServiceContext` implementation for unit tests.
+//
+// Every method either returns a sensible default, throws "not implemented"
+// (for surfaces a given test won't exercise), or records the call for later
+// assertion. Tests opt in to richer behavior by overriding fields after
+// construction — the typical pattern is:
+//
+//   const runtime = createFakeRuntime();
+//   runtime.subscription.isPro = async () => true;
+//   const manager = createIntegrationManager(runtime);
+//
+// This file lives in the package's own __tests__/ tree so tests are
+// runtime-pure (no VS Code, no `Container`).
 import type {
 	AccountProvider,
 	AuthenticationSessionsChangeEvent,
@@ -27,8 +37,10 @@ import type {
 	IntegrationStorageProvider,
 	RepositoriesProvider,
 } from '../context.js';
+import { createMockCredentialSource } from './mockCredentialSource.js';
 
 export interface FakeRuntime extends IntegrationServiceContext {
+	readonly account: AccountProvider & { fetchGkApi(path: string, init?: RequestInit): Promise<Response> };
 	/** Captured telemetry-hook invocations for assertion. */
 	readonly emittedEvents: Array<{ event: string; props?: Record<string, unknown>; source?: unknown }>;
 	/** Number of times `cache.deletePullRequests` was called. */
@@ -89,7 +101,7 @@ export function createFakeRuntime(): FakeRuntime {
 		},
 	};
 
-	const account: AccountProvider = {
+	const account: FakeRuntime['account'] = {
 		getAccount: async () => undefined,
 		onDidChange: subOnChange.event,
 		onDidCheckIn: subOnCheckIn.event,
@@ -161,6 +173,7 @@ export function createFakeRuntime(): FakeRuntime {
 
 	// Capture telemetry-hook invocations under stable event names for assertions.
 	const hooks: IntegrationServiceHooks = {
+		onDidChangeConnections: subOnCheckIn.event,
 		connection: {
 			onStarted: (e, source) =>
 				emittedEvents.push({ event: 'integration.connection.started', props: { ...e }, source: source }),
@@ -185,7 +198,7 @@ export function createFakeRuntime(): FakeRuntime {
 		},
 	};
 
-	return {
+	const runtime: FakeRuntime = {
 		storage: storageProvider,
 		account: account,
 		config: config,
@@ -202,4 +215,6 @@ export function createFakeRuntime(): FakeRuntime {
 		fireAuthenticationSessionChange: (providerId: string) => authOnChange.fire({ provider: { id: providerId } }),
 		fireConfigChange: (change: ConfigChangeEvent) => configOnChange.fire(change),
 	};
+	Object.assign(hooks, createMockCredentialSource(runtime));
+	return runtime;
 }

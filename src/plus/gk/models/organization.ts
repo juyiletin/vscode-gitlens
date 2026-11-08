@@ -72,7 +72,6 @@ export type GkDevAIProviderType =
 	| 'azure'
 	| 'deepseek'
 	| 'github_copilot'
-	| 'gitkraken_ai'
 	| 'google'
 	| 'huggingface'
 	| 'mistral'
@@ -94,8 +93,6 @@ export function fromGkDevAIProviderType(type: unknown): AIProviders | never {
 			return 'deepseek';
 		case 'github_copilot':
 			return 'vscode';
-		case 'gitkraken_ai':
-			return 'gitkraken';
 		case 'google':
 			return 'gemini';
 		case 'huggingface':

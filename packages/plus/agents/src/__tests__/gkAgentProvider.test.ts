@@ -162,6 +162,30 @@ function fileActivityOf(provider: GkAgentProvider, sessionId: string): NonNullab
 }
 
 suite('GkAgentProvider', () => {
+	test('keeps live IPC sessions without polling an unconfigured CLI and resumes polling when configured', async () => {
+		const { callbacks, handlers, cliCalls } = createMockCallbacks();
+		let configured = false;
+		callbacks.canRunCLICommand = () => configured;
+		const provider = new GkAgentProvider(callbacks);
+		try {
+			provider.start(['/repo']);
+			await flushMicrotasks();
+			const handler = handlers.get('agents/session');
+			assert.ok(handler);
+			await handler(sessionStart('ipc-only-session', '/repo'), new URLSearchParams());
+			await provider.sync();
+			assert.ok(provider.sessions.some(session => session.id === 'ipc-only-session'));
+			assert.deepStrictEqual(await provider.getArchivedSessionIds(), []);
+			assert.strictEqual(await provider.relayOpenSession('elsewhere', '/repo'), false);
+			assert.strictEqual(cliCalls.length, 0);
+			configured = true;
+			await provider.sync();
+			assert.strictEqual(listSessionsCalls(cliCalls), 1);
+		} finally {
+			provider.dispose();
+		}
+	});
+
 	suite('initialCwd from the CLI', () => {
 		test('uses the CLI-provided initialCwd and keeps it stable across cwd drift', async () => {
 			const { callbacks, handlers } = createMockCallbacks();

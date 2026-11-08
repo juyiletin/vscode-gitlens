@@ -4,14 +4,11 @@ import type { Event } from '@gitlens/utils/event.js';
 import { Emitter } from '@gitlens/utils/event.js';
 import type { IntegrationIds } from '../constants.js';
 import type { Sources } from '../telemetry.js';
-import { areDomainsOnSameHost } from '../utils/domain.utils.js';
-import { isNonExpiringZeroTokenIntegrationId, isSelfManagedHostIntegrationId } from '../utils/integration.utils.js';
+import { areDomainsOnSameHost, hostFromDomain } from '../utils/domain.utils.js';
+import { isSelfManagedHostIntegrationId } from '../utils/integration.utils.js';
 import type { ConfiguredIntegrationService } from './configuredIntegrationService.js';
 import type { IntegrationAuthenticationService } from './integrationAuthenticationService.js';
 import type { ProviderAuthenticationSession } from './models.js';
-import { isSupportedCloudIntegrationId } from './models.js';
-
-const maxSmallIntegerV8 = 2 ** 30 - 1; // Max number that can be stored in V8's smis (small integers)
 
 export interface IntegrationAuthenticationProviderDescriptor {
 	id: IntegrationIds;
@@ -34,17 +31,16 @@ export interface IntegrationAuthenticationSessionDescriptor {
 
 /**
  * Options for {@link IntegrationAuthenticationProvider.getSession}. The two variants keep `sync` exclusive
- * with the interactive flags: a sync resolves whatever the cloud already has, so it must never open a connect
+ * with the interactive flags: a sync resolves the provider's existing credentials, so it must never open a connect
  * window.
  *
  * `refreshRejectedToken` marks the stored token as known-refused by the provider (an `AuthenticationError` on
- * a previous read), which forces a cloud `/refresh` even when the token's expiry still claims it is valid —
- * the case a purely time-based refresh cannot see. The refresh token itself never reaches the client: the GK
- * cloud performs the exchange server-side.
+ * a previous read), which forces the host to resolve credentials even when the token's expiry still claims
+ * it is valid — the case a purely time-based refresh cannot see.
  *
  * `refetch` (sync only) fetches a fresh token instead of serving the stored one, WITHOUT deleting the stored one
  * first: it is replaced only once the fetch returns a session. A forced re-sync used to delete it up front, so a
- * fetch that failed transiently (a GK API 429 or 5xx) left the connection with no token at all, and every read
+ * fetch that failed transiently left the connection with no token at all, and every read
  * until the next good sync reported it as gone (gitkraken/kepler#3546).
  */
 export type GetSessionOptions =
@@ -72,6 +68,13 @@ export type GetSessionOptions =
 type GetNewSessionOptions = GetSessionOptions & { refreshIfExpired?: boolean };
 
 export interface IntegrationAuthenticationProvider extends Disposable {
+	/** Let the integration service persist credentials returned by this interactive resolver. */
+	readonly persistSessions?: boolean;
+	/** Revalidates persisted credentials owned by an external session manager before reuse. */
+	validateSession?(
+		session: ProviderAuthenticationSession,
+		descriptor: IntegrationAuthenticationSessionDescriptor,
+	): Promise<ProviderAuthenticationSession | undefined>;
 	/**
 	 * Clears the stored secret for one connection only (never the whole provider). Unlike
 	 * {@link deleteAllSessions}, this by default leaves the descriptor in `integrations:configured` — its
@@ -86,7 +89,7 @@ export interface IntegrationAuthenticationProvider extends Disposable {
 	): Promise<void>;
 	deleteAllSessions(descriptor?: IntegrationAuthenticationSessionDescriptor): Promise<void>;
 	/**
-	 * Resolves the session for `descriptor`, from storage when it is still usable and from the cloud
+	 * Resolves the session for `descriptor`, from storage when it is still usable and from the host
 	 * otherwise. See {@link GetSessionOptions}.
 	 */
 	getSession(
@@ -104,6 +107,7 @@ abstract class IntegrationAuthenticationProviderBase<
 	constructor(
 		protected readonly authenticationService: IntegrationAuthenticationService,
 		protected readonly configuredIntegrationService: ConfiguredIntegrationService,
+		protected readonly host?: IntegrationAuthenticationProvider,
 	) {}
 
 	dispose(): void {
@@ -122,6 +126,10 @@ abstract class IntegrationAuthenticationProviderBase<
 		descriptor: IntegrationAuthenticationSessionDescriptor,
 		options?: { preserveConfigured?: boolean },
 	): Promise<void> {
+		if (descriptor.cloud == null && this.authenticationService.ctx.hooks?.getConnections != null) {
+			descriptor = { ...descriptor, cloud: true };
+		}
+
 		const domain = isSelfManagedHostIntegrationId(this.authProviderId) ? descriptor?.domain : undefined;
 		const configured = this.configuredIntegrationService.getConfigured(this.authProviderId, {
 			domain: domain,
@@ -132,9 +140,11 @@ abstract class IntegrationAuthenticationProviderBase<
 		// otherwise resolve the local id and leave the cloud secret intact.
 		await this.configuredIntegrationService.deleteStoredSessions(
 			this.authProviderId,
-			{ ...descriptor, cloud: true },
-			true,
-			{ preserveConfigured: options?.preserveConfigured ?? true },
+			descriptor,
+			descriptor.cloud,
+			{
+				preserveConfigured: options?.preserveConfigured ?? true,
+			},
 		);
 
 		if (configured?.length) {
@@ -163,6 +173,20 @@ abstract class IntegrationAuthenticationProviderBase<
 		descriptor: IntegrationAuthenticationSessionDescriptor,
 		options?: GetSessionOptions,
 	): Promise<ProviderAuthenticationSession | undefined> {
+		if (options?.sync && descriptor.cloud == null && this.authenticationService.ctx.hooks?.getConnections != null) {
+			descriptor = { ...descriptor, cloud: true };
+		}
+
+		if (descriptor.connectionId && descriptor.cloud == null) {
+			const configured = this.configuredIntegrationService.getConfigured(this.authProviderId, {
+				domain: isSelfManagedHostIntegrationId(this.authProviderId) ? descriptor.domain : undefined,
+			});
+			const selected =
+				configured.find(item => item.id === descriptor.connectionId && item.cloud) ??
+				configured.find(item => item.id === descriptor.connectionId);
+			descriptor = { ...descriptor, cloud: selected?.cloud ?? true };
+		}
+
 		let session;
 		let previousToken;
 		let refetched: ProviderAuthenticationSession | undefined;
@@ -171,11 +195,7 @@ abstract class IntegrationAuthenticationProviderBase<
 			if (isSelfManagedHostIntegrationId(this.authProviderId)) {
 				const connectionId =
 					descriptor.connectionId ||
-					this.configuredIntegrationService.getConfiguredConnectionId(
-						this.authProviderId,
-						descriptor.domain,
-						true,
-					);
+					this.configuredIntegrationService.resolveConnectionId(this.authProviderId, descriptor);
 				if (
 					!this.configuredIntegrationService.isConnectionConfiguredForHost(
 						this.authProviderId,
@@ -193,20 +213,35 @@ abstract class IntegrationAuthenticationProviderBase<
 			// it is not stored back; the mark is taken after it, so this session's own fetch is not refused.
 			await this.configuredIntegrationService.deleteStoredSessions(
 				this.authProviderId,
-				{ ...descriptor, cloud: true },
-				true,
-				{ signOut: true, preserveConfigured: isSelfManagedHostIntegrationId(this.authProviderId) },
+				descriptor,
+				descriptor.cloud,
+				{
+					signOut: true,
+					preserveConfigured: isSelfManagedHostIntegrationId(this.authProviderId),
+				},
 			);
 			signOutMark = this.configuredIntegrationService.getSignOutMark();
 		} else {
 			// Taken before the stored-token read (a sign-out landing during the read is ordered after it by the storage
 			// lock, so it counts either way).
 			signOutMark = this.configuredIntegrationService.getSignOutMark();
-			const stored = await this.configuredIntegrationService.getStoredSession(
-				this.authProviderId,
-				options?.sync ? { ...descriptor, cloud: true } : descriptor,
-			);
+			let stored = await this.configuredIntegrationService.getStoredSession(this.authProviderId, descriptor);
 			previousToken = stored?.accessToken;
+			if (stored != null && this.host?.validateSession != null) {
+				const validated = await this.host.validateSession(stored, descriptor);
+				if (
+					validated != null &&
+					validated !== stored &&
+					!(await this.configuredIntegrationService.storeSession(this.authProviderId, validated, {
+						signOutMark: signOutMark,
+					}))
+				) {
+					stored = undefined;
+				} else {
+					stored = validated;
+				}
+			}
+
 			if (options?.sync && options.refetch) {
 				refetched = stored;
 			} else {
@@ -243,8 +278,8 @@ abstract class IntegrationAuthenticationProviderBase<
 				if (refetched?.id != null && refetched.id !== session.id) {
 					await this.configuredIntegrationService.deleteStoredSessions(
 						this.authProviderId,
-						{ ...descriptor, connectionId: refetched.id, cloud: true },
-						true,
+						{ ...descriptor, connectionId: refetched.id, cloud: refetched.cloud },
+						refetched.cloud,
 						{ preserveConfigured: true },
 					);
 				}
@@ -268,209 +303,83 @@ abstract class IntegrationAuthenticationProviderBase<
 	}
 }
 
-export class CloudIntegrationAuthenticationProvider<
+/** Wraps a consumer-owned provider with the package's local secret storage and connection descriptors. */
+export class HostIntegrationAuthenticationProvider<
 	ID extends IntegrationIds = IntegrationIds,
 > extends IntegrationAuthenticationProviderBase<ID> {
 	constructor(
 		authenticationService: IntegrationAuthenticationService,
 		configuredIntegrationService: ConfiguredIntegrationService,
 		private readonly _authProviderId: ID,
+		host?: IntegrationAuthenticationProvider,
 	) {
-		super(authenticationService, configuredIntegrationService);
+		super(authenticationService, configuredIntegrationService, host);
+		if (host == null) return;
+
+		this.disposables.push(
+			host.onDidChange(() => this.fireChange()),
+			{ dispose: () => host.dispose() },
+		);
 	}
 
 	protected get authProviderId(): ID {
 		return this._authProviderId;
 	}
 
-	protected override async getNewSession(
+	protected async getNewSession(
 		descriptor: IntegrationAuthenticationSessionDescriptor,
 		options?: GetNewSessionOptions,
 	): Promise<ProviderAuthenticationSession | undefined> {
-		if (options?.forceNewSession) {
-			if ((await this.disconnectCloudSession(descriptor)) === 'failure') {
-				return undefined;
-			}
+		if (this.host == null) return undefined;
 
-			void this.connectCloudSession(false, options?.source);
+		if (
+			!options?.sync &&
+			!options?.createIfNeeded &&
+			!options?.forceNewSession &&
+			!options?.refreshIfExpired &&
+			!options?.refreshRejectedToken
+		) {
 			return undefined;
 		}
 
-		// TODO: This is a stopgap to make sure we're not hammering the api on automatic calls to get the session.
-		// Ultimately we want to timestamp calls to syncCloudIntegrations and use that to determine whether we should
-		// make the call or not.
-		// `refreshRejectedToken` joins the list for the same reason `refreshIfExpired` is on it: both mean the
-		// session in hand is known-unusable, so skipping the cloud round trip would just re-serve it.
-		let session =
-			options?.refreshIfExpired ||
-			options?.refreshRejectedToken ||
-			options?.createIfNeeded ||
-			options?.forceNewSession ||
-			options?.sync
-				? await this.getCloudSession(descriptor, { refreshRejectedToken: options?.refreshRejectedToken })
-				: undefined;
+		const hostOptions: GetSessionOptions = options?.forceNewSession
+			? { forceNewSession: true }
+			: options?.createIfNeeded
+				? { createIfNeeded: true }
+				: { sync: true, refetch: true, refreshRejectedToken: options?.refreshRejectedToken };
+		let session = await this.host.getSession(descriptor, hostOptions);
+		if (session == null || !isSelfManagedHostIntegrationId(this.authProviderId)) return session;
 
-		const shouldCreateSession = options?.createIfNeeded && session == null;
-		if (shouldCreateSession) {
-			const connected = await this.connectCloudSession(true, options?.source);
-			if (!connected) return undefined;
-
-			// This should get us the session we just created with connectCloudSession, because a syncCloudIntegrations run from
-			// integration service should have resulted in it being created and stored by this provider
-			session = await this.getSession(descriptor, { source: options?.source });
-		}
-		return session;
-	}
-
-	private connectCloudSession(skipIfConnected: boolean, source: Sources | undefined): Promise<boolean> {
-		// Capture in a const so the type guard narrows it to `SupportedCloudIntegrationIds` (a getter
-		// access wouldn't narrow), letting us call the service directly without a cast.
-		const id = this.authProviderId;
-		if (isSupportedCloudIntegrationId(id)) {
-			return this.authenticationService.connectCloudIntegrations(
-				{ integrationIds: [id], skipIfConnected: skipIfConnected, skipPreSync: true },
-				{
-					source: source ?? 'integrations',
-					detail: {
-						action: 'connect',
-						integration: id,
-					},
-				},
-			);
-		}
-
-		return Promise.resolve(false);
-	}
-
-	private async getCloudSession(
-		descriptor: IntegrationAuthenticationSessionDescriptor,
-		options?: { refreshRejectedToken?: boolean },
-	): Promise<ProviderAuthenticationSession | undefined> {
-		const loggedIn = (await this.authenticationService.ctx.account.getAccount()) != null;
-		if (!loggedIn) return undefined;
-
-		const cloudIntegrations = this.authenticationService.cloudIntegrations;
-		// An unscoped descriptor (no explicit connectionId) would fetch the provider-global primary via
-		// `v1/provider-tokens/<provider>`. For a self-managed provider spanning multiple hosts that primary
-		// can belong to a different host, so a forced sync of host A would hydrate host B's token here (before
-		// reconcile corrects storage). Scope to this host's own configured connection when we have one; fall
-		// through to the provider-scoped path only when nothing is configured yet (legacy/first sync).
 		const connectionId =
-			descriptor.connectionId ??
-			(isSelfManagedHostIntegrationId(this.authProviderId)
-				? this.configuredIntegrationService.getConfiguredConnectionId(
-						this.authProviderId,
-						descriptor.domain,
-						true,
-					)
-				: undefined);
-		// Refuses a session issued for a DIFFERENT host than the one this connection is keyed by, which would
-		// otherwise let host B's token serve host A.
-		//
-		// A session that names no host is accepted ONLY when it was fetched by a connection id WE have stored
-		// for this host. That descriptor is what ties the token to the host, so an absent domain then means the
-		// backend did not say rather than that the token belongs elsewhere, and refusing it would strand the
-		// refresh.
-		//
-		// A non-null id is not enough on its own: `descriptor.connectionId` can come from the caller, and with
-		// no id at all the fetch goes to the provider-GLOBAL primary endpoint whose token can belong to any
-		// configured host. In both of those cases a domainless response must be refused, or a token would be
-		// bound to — and sent to — a host it was never issued for.
-		const scopedToThisHost = this.configuredIntegrationService.isConnectionConfiguredForHost(
-			this.authProviderId,
-			connectionId,
-			descriptor.domain,
-		);
-		const isForAnotherHost = (session: { domain: string } | undefined) =>
-			session != null &&
-			isSelfManagedHostIntegrationId(this.authProviderId) &&
-			(!scopedToThisHost || Boolean(session.domain?.trim())) &&
-			!areDomainsOnSameHost(session.domain, descriptor.domain);
-
-		let session = await cloudIntegrations.getConnectionSession(this.authProviderId, undefined, connectionId);
-		if (isForAnotherHost(session)) return undefined;
-
-		// GitHub, the cloud self-managed hosts, and Trello return `expiresIn: 0` for a token that never
-		// expires; left as 0 the session would be built with `expiresAt = now` and rejected as expired on the
-		// next resolution. Map it to the maximum expiry so it isn't refreshed frequently.
-		if (session?.expiresIn === 0 && isNonExpiringZeroTokenIntegrationId(this.authProviderId)) {
-			session.expiresIn = maxSmallIntegerV8; // maximum expiration length
-		}
-
-		// `expiresIn < 60` is a PREDICTION that the token is about to lapse, and it is the only trigger the
-		// refresh used to have. It cannot see a token the provider has already refused while the backend
-		// still believes it is valid — a revoked grant, retired scopes, an app removed from the org — where
-		// `expiresIn` stays high and the doomed token is re-sent on every read. `refreshRejectedToken` is
-		// the observed counterpart: the caller saw the provider reject this exact token, so refresh it
-		// regardless of what its expiry claims.
-		if (session != null && (session.expiresIn < 60 || options?.refreshRejectedToken)) {
-			session = await cloudIntegrations.getConnectionSession(
-				this.authProviderId,
-				session.accessToken,
-				connectionId,
-			);
-			if (isForAnotherHost(session)) return undefined;
-		}
-
-		if (!session) return undefined;
-
-		let sessionProtocol;
-		// Only derive a protocol from a domain carrying an explicit scheme; a bare `host:port` (e.g. a
-		// self-managed `ghe.example.com:8443`) parses the host as the protocol, corrupting the value.
-		if (/^[a-z][a-z\d+\-.]*:\/\//i.test(session.domain)) {
-			try {
-				sessionProtocol = new URL(session.domain).protocol;
-			} catch {
-				sessionProtocol = undefined;
-			}
-		}
-
-		return {
-			// Prefer the backend's per-connection token id (multi-account); fall back to the resolved
-			// primary/legacy connection id so existing single-connection storage keys are preserved.
-			id: session.id ?? this.configuredIntegrationService.resolveConnectionId(this.authProviderId, descriptor),
-			accessToken: session.accessToken,
-			scopes: descriptor.scopes,
-			account: {
-				id: '',
-				label: '',
-			},
-			cloud: true,
-			type: session.type,
-			expiresAt: new Date(session.expiresIn * 1000 + Date.now()),
-			// Note: do not use the session's domain, because the format is different than in our model
-			domain: descriptor.domain,
-			// That format difference is exactly what `baseUrl` is for: the descriptor's domain is the
-			// normalized host this connection is keyed by, so a context path only survives on the wire value.
-			// When the backend reports no domain at all, KEEP the address already configured rather than
-			// writing `undefined` — `writeSecret` mirrors this onto the descriptor, so falling back to the
-			// bare host here would drop a context path the user never changed on the next refresh.
-			baseUrl:
-				session.domain ||
-				this.configuredIntegrationService.getConfiguredBaseUrl(
+			descriptor.connectionId ||
+			this.configuredIntegrationService.resolveConnectionId(this.authProviderId, descriptor);
+		const configured = this.configuredIntegrationService
+			.getConfigured(this.authProviderId)
+			.find(item => item.id === connectionId);
+		if (!session.domain) {
+			if (
+				!this.configuredIntegrationService.isConnectionConfiguredForHost(
 					this.authProviderId,
 					connectionId,
 					descriptor.domain,
-				),
-			protocol: sessionProtocol ?? undefined,
-			// Carried for providers whose client needs an app key alongside the token (e.g. Trello).
-			appKey: session.appKey,
-		};
-	}
+				)
+			) {
+				return undefined;
+			}
 
-	private async disconnectCloudSession(
-		descriptor: IntegrationAuthenticationSessionDescriptor,
-	): Promise<'skip' | 'success' | 'failure'> {
-		const loggedIn = (await this.authenticationService.ctx.account.getAccount()) != null;
-		if (!loggedIn) return 'skip';
-
-		const cloudIntegrations = this.authenticationService.cloudIntegrations;
-		if (!(await cloudIntegrations.disconnect(this.authProviderId, descriptor.connectionId))) return 'failure';
-
-		if (isSelfManagedHostIntegrationId(this.authProviderId)) {
-			await this.deleteSession(descriptor, { preserveConfigured: false });
+			session = {
+				...session,
+				domain: descriptor.domain,
+				baseUrl: session.baseUrl || configured?.baseUrl || configured?.domain,
+			};
 		}
 
-		return 'success';
+		if (!areDomainsOnSameHost(session.domain, descriptor.domain)) return undefined;
+
+		return {
+			...session,
+			domain: hostFromDomain(session.domain) ?? descriptor.domain,
+			baseUrl: session.baseUrl || configured?.baseUrl || session.domain,
+		};
 	}
 }

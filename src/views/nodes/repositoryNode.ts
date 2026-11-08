@@ -17,10 +17,6 @@ import { GlRepository } from '../../git/models/repository.js';
 import { getRepositoryStatusIconPath } from '../../git/utils/-webview/icons.js';
 import { formatLastFetched } from '../../git/utils/-webview/repository.utils.js';
 import type {
-	CloudWorkspace,
-	CloudWorkspaceRepositoryDescriptor,
-} from '../../plus/workspaces/models/cloudWorkspace.js';
-import type {
 	LocalWorkspace,
 	LocalWorkspaceRepositoryDescriptor,
 } from '../../plus/workspaces/models/localWorkspace.js';
@@ -92,9 +88,11 @@ function getCurrentBranchTooltip(status: GitStatus, providerName: string | undef
 			behind,
 		);
 	}
+
 	if (behind) {
 		return getBehindCurrentBranchTooltip(status.branch, upstream.name, providerName, status.rebasing, behind);
 	}
+
 	if (ahead) {
 		return getAheadCurrentBranchTooltip(status.branch, upstream.name, providerName, status.rebasing, ahead);
 	}
@@ -323,11 +321,11 @@ export class RepositoryNode extends SubscribeableViewNode<'repository', ViewsWit
 		return this.repo.path;
 	}
 
-	get workspace(): CloudWorkspace | LocalWorkspace | undefined {
+	get workspace(): LocalWorkspace | undefined {
 		return this.context.workspace;
 	}
 
-	get wsRepositoryDescriptor(): CloudWorkspaceRepositoryDescriptor | LocalWorkspaceRepositoryDescriptor | undefined {
+	get wsRepositoryDescriptor(): LocalWorkspaceRepositoryDescriptor | undefined {
 		return this.context.wsRepositoryDescriptor;
 	}
 
@@ -453,6 +451,7 @@ export class RepositoryNode extends SubscribeableViewNode<'repository', ViewsWit
 
 			this.children = children;
 		}
+
 		return this.children;
 	}
 
@@ -475,13 +474,10 @@ export class RepositoryNode extends SubscribeableViewNode<'repository', ViewsWit
 		if (this.repo.starred) {
 			contextValue += '+starred';
 		}
+
 		if (workspace != null) {
 			contextValue += '+workspace';
-			if (workspace.type === 'cloud') {
-				contextValue += '+cloud';
-			} else if (workspace.type === 'local') {
-				contextValue += '+local';
-			}
+			contextValue += '+local';
 		}
 
 		if (this.repo.virtual) {
@@ -520,6 +516,7 @@ export class RepositoryNode extends SubscribeableViewNode<'repository', ViewsWit
 				if (status.upstream.state.behind) {
 					contextValue += '+behind';
 				}
+
 				if (status.upstream.state.ahead) {
 					contextValue += '+ahead';
 				}

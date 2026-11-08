@@ -17,7 +17,6 @@ import './settings-agents.js';
 import './settings-ai.js';
 import './settings-autolinks.js';
 import './settings-integrations.js';
-import './settings-notifications.js';
 import './settings-remotes.js';
 import './settings-scm-views.js';
 import './settings-setup.js';
@@ -360,9 +359,6 @@ export class GlSettingControl extends SignalWatcher(LitElement) {
 			case 'account':
 				return html`<gl-settings-account .actions=${this.actions}></gl-settings-account>`;
 
-			case 'notifications':
-				return html`<gl-settings-notifications .actions=${this.actions}></gl-settings-notifications>`;
-
 			case 'info':
 				return html`<div class="info" role="note">
 					<code-icon icon="info" aria-hidden="true"></code-icon>
@@ -395,6 +391,7 @@ export class GlSettingControl extends SignalWatcher(LitElement) {
 				} else {
 					checked = Boolean(value);
 				}
+
 				break;
 			}
 		}
@@ -429,6 +426,7 @@ export class GlSettingControl extends SignalWatcher(LitElement) {
 
 	private renderHint(hint: string | undefined) {
 		if (!hint) return nothing;
+
 		return html`<p class="hint">
 			<code-icon icon="info" aria-hidden="true"></code-icon><span>${linkify(hint)}</span>
 		</p>`;

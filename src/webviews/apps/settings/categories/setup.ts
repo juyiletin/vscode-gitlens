@@ -4,32 +4,16 @@ import type { SettingsCategory } from '../model.js';
 export const setupCategories: SettingsCategory[] = [
 	{
 		id: 'account',
-		name: l10n.t('Account'),
+		name: l10n.t('Features'),
 		group: 'Setup',
 		icon: 'account',
-		hint: l10n.t('Sign in to your GitKraken account to unlock GitLens Pro features, or manage your plan'),
-		learnMoreUrl: 'https://help.gitkraken.com/gitlens/gitlens-community-vs-gitlens-pro/',
+		hint: l10n.t('Local Pro access is enabled for this fork.'),
 		controls: [
 			{
 				kind: 'account',
 				// Search text — the rendered panel comes from the shared subscription RPC service
-				label: l10n.t('Account, sign in, and GitLens Pro plan'),
-				hint: l10n.t('Sign in or create a GitKraken account, manage your subscription, and upgrade your plan'),
-			},
-		],
-	},
-	{
-		id: 'notifications',
-		name: l10n.t('Notifications'),
-		group: 'Setup',
-		icon: 'bell',
-		hint: l10n.t('Messages from GitKraken for your account and organization'),
-		controls: [
-			{
-				kind: 'notifications',
-				// Search text — the rendered inbox comes from the notifications RPC service
-				label: l10n.t('Notifications inbox'),
-				hint: l10n.t('Read, mark, and delete GitKraken notifications, and choose whether to receive offers'),
+				label: l10n.t('Features'),
+				hint: l10n.t('Local Pro access is enabled for this fork.'),
 			},
 		],
 	},
@@ -38,9 +22,7 @@ export const setupCategories: SettingsCategory[] = [
 		name: l10n.t('Get Started'),
 		group: 'Setup',
 		icon: 'checklist',
-		hint: l10n.t(
-			'Connect your services, choose an AI provider and model, and set up MCP and hooks for your agents',
-		),
+		hint: l10n.t('Connect your services and choose an AI provider and model.'),
 		learnMoreUrl: 'https://help.gitkraken.com/gitlens/gitlens-start-here/',
 		controls: [
 			{

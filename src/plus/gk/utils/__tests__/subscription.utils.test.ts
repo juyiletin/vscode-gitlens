@@ -7,6 +7,7 @@ import { defaultPlansContent } from '../../models/plans.js';
 import type { Subscription, SubscriptionPlanIds } from '../../models/subscription.js';
 import {
 	computeSubscriptionState,
+	getLocalSubscription,
 	getSubscriptionPlan,
 	getSubscriptionPlanAiCredits,
 	getSubscriptionPlanFeatures,
@@ -15,6 +16,17 @@ import {
 } from '../subscription.utils.js';
 
 suite('Subscription Utils Test Suite', () => {
+	test('the fork subscription grants local Pro access without an account or expiration', () => {
+		const subscription = getLocalSubscription();
+
+		assert.strictEqual(subscription.account, undefined);
+		assert.strictEqual(subscription.state, SubscriptionState.Paid);
+		assert.strictEqual(subscription.plan.actual.id, 'pro');
+		assert.strictEqual(subscription.plan.effective.id, 'pro');
+		assert.strictEqual(subscription.plan.effective.expiresOn, undefined);
+		assert.strictEqual(computeSubscriptionState(subscription), SubscriptionState.Paid);
+	});
+
 	suite('getSubscriptionPlanAiCredits', () => {
 		test('a non-trial returns the plan’s own aiCredits figure', () => {
 			assert.strictEqual(getSubscriptionPlanAiCredits(defaultPlansContent, 'pro', false), '1M');
@@ -79,6 +91,7 @@ suite('Subscription Utils Test Suite', () => {
 			for (const feature of features) {
 				assert.ok(!feature.includes('250K'), `unexpected 250K in: ${feature}`);
 			}
+
 			assert.ok(
 				features.some(feature => feature.includes('500K')),
 				'expected the 500K Business Trial figure in at least one bullet',

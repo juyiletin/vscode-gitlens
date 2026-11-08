@@ -2201,6 +2201,8 @@ export class GkAgentProvider implements AgentSessionProvider {
 	}
 
 	private async fetchArchivedSessionIds(): Promise<string[]> {
+		if (this.callbacks.canRunCLICommand?.() === false) return [];
+
 		try {
 			const output = await this.callbacks.runCLICommand([
 				'ai',
@@ -2902,6 +2904,14 @@ export class GkAgentProvider implements AgentSessionProvider {
 	}
 
 	protected async syncSessions(options?: { gate?: boolean }): Promise<void> {
+		if (this.callbacks.canRunCLICommand?.() === false) {
+			if (this.pruneDeadSessions()) {
+				this._onDidChangeSessions.fire();
+			}
+
+			return;
+		}
+
 		// Recurring (gated) calls skip the CLI spawn when there's nothing to reconcile: no tracked
 		// sessions AND no installed hooks. Sessions only ever appear via the IPC push path or a peer,
 		// so an empty list with hooks off means no agents are reachable here. We still poll whenever
@@ -3676,6 +3686,8 @@ export class GkAgentProvider implements AgentSessionProvider {
 	 *  parse failure, or when the CLI predates the `open-session` hook command — never throws, and
 	 *  never falls back to a direct peer HTTP call. */
 	async relayOpenSession(sessionId: string, path: string): Promise<boolean> {
+		if (this.callbacks.canRunCLICommand?.() === false) return false;
+
 		const args = ['ai', 'hook', 'open-session', sessionId, '--path', path];
 		const ownAddress = this.callbacks.ipc.address;
 		if (ownAddress != null) {

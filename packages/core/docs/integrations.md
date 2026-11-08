@@ -59,30 +59,9 @@ stubs for unrelated repository, pull-request, or issue caches. The fixture uses 
 
 Two strategies, both through the same context:
 
-1. **GK cloud (what GitLens does).** Implement `account.connect` / `openManagement` / `fetchGkApi`; the
-   package syncs connections, stores per-connection sessions, tracks primaries, and reconciles multi-account
-   state on check-in. `refreshConnections()` forces that sync on demand.
-2. **Your own tokens.** Return a provider from the `hooks.createAuthenticationProvider` hook.
-   `createManualTokenAuthProvider({ id, token, account, domain? })` wraps a static token; for refreshable
-   tokens implement `IntegrationAuthenticationProvider` directly. A manual-token session never expires and
-   returns `undefined` on `forceNewSession`, so a reauth-on-failure loop terminates.
+The manager uses provider-owned authentication. Supply `hooks.createAuthenticationProvider` for an interactive or externally managed credential source. Adapters with `persistSessions: true` ask the package to persist returned sessions and scope disconnects to their configured connection. Other custom adapters retain ownership of their storage and session behavior.
 
-### Lifecycle
-
-```ts
-const manager = createIntegrationManager(runtime);
-try {
-	/* reads */
-} finally {
-	manager.dispose(); // tears down cached integrations, auth providers, and every host subscription
-}
-```
-
-`onDidChange` fires when the configured-connection set changes; `onDidChangeConnectionState` when a
-provider connects/disconnects. Both are safe to drive cache invalidation from.
-
-`refreshConnections()` is an authoritative foreground refresh: it rejects if the GK backend connection list
-cannot be read and leaves the last known configuration intact. Background check-in remains best-effort.
+An optional `hooks.getConnections` publishes a consumer-owned connection inventory. `hooks.onDidChangeConnections` announces inventory changes. No GitKraken token-exchange client is included. GitLens's own adapter uses VS Code authentication or user-supplied credentials stored in SecretStorage.
 
 ## 3. Multi-account and self-managed hosts
 

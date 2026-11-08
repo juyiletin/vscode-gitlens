@@ -199,12 +199,12 @@ export class GlFeatureGatePlusState extends LitElement {
 					<p class="actions-row">
 						<gl-button
 							class="inline"
-							href="${createCommandLink<Source>('gitlens.plus.signUp', this.source)}"
+							href="${createCommandLink<Source>('gitlens.showSettingsPage!account', this.source)}"
 							>&nbsp;${l10n.t('Try GitLens Pro')}&nbsp;</gl-button
 						><span
 							>${localizedContent(l10n.t('or {signIn}'), {
 								signIn: html`<a
-									href="${createCommandLink<Source>('gitlens.plus.login', this.source)}"
+									href="${createCommandLink<Source>('gitlens.showSettingsPage!account', this.source)}"
 									title=${l10n.t('Sign In')}
 									>${l10n.t('sign in')}</a
 								>`,
@@ -227,10 +227,13 @@ export class GlFeatureGatePlusState extends LitElement {
 					<p class="actions-row">
 						<gl-button
 							class="inline"
-							href="${createCommandLink<SubscriptionUpgradeCommandArgs>('gitlens.plus.upgrade', {
-								plan: 'pro',
-								...(this.source ?? { source: 'feature-gate' }),
-							})}"
+							href="${createCommandLink<SubscriptionUpgradeCommandArgs>(
+								'gitlens.showSettingsPage!account',
+								{
+									plan: 'pro',
+									...(this.source ?? { source: 'feature-gate' }),
+								},
+							)}"
 							>${l10n.t('Upgrade to Pro')}</gl-button
 						>
 					</p>
@@ -247,17 +250,20 @@ export class GlFeatureGatePlusState extends LitElement {
 					<p class="actions-row">
 						<gl-button
 							class="inline"
-							href="${createCommandLink<Source>('gitlens.plus.reactivateProTrial', this.source)}"
+							href="${createCommandLink<Source>('gitlens.showSettingsPage!account', this.source)}"
 							>${l10n.t('Continue')}</gl-button
 						>
 					</p>
 					<p class="centered">
 						${localizedContent(l10n.t('or {upgrade}'), {
 							upgrade: html`<a
-								href="${createCommandLink<SubscriptionUpgradeCommandArgs>('gitlens.plus.upgrade', {
-									plan: 'pro',
-									...(this.source ?? { source: 'feature-gate' }),
-								})}"
+								href="${createCommandLink<SubscriptionUpgradeCommandArgs>(
+									'gitlens.showSettingsPage!account',
+									{
+										plan: 'pro',
+										...(this.source ?? { source: 'feature-gate' }),
+									},
+								)}"
 								title=${l10n.t('Upgrade to Pro')}
 								>${l10n.t('upgrade to Pro')}</a
 							>`,

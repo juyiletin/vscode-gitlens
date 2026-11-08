@@ -1,7 +1,7 @@
 import type { TemplateResult } from 'lit';
 import type { AgentSessionPhase } from '@gitlens/agents/types.js';
+import type { GitFileChangeShape } from '@gitlens/git/models/fileChange.js';
 import type { GitFileStatus } from '@gitlens/git/models/fileStatus.js';
-import type { DraftPatchFileChange } from '../../../../../plus/drafts/models/drafts.js';
 
 /** `dataTransfer` type used when a draggable file row (opt-in `draggableFiles`) is dragged; the
  *  payload is the row's file `path`. Consumers key their drop handling off this type. */
@@ -209,7 +209,7 @@ export interface TreeModelFlat extends TreeModelBase {
 
 export interface TreeItemSelectionDetail {
 	node: TreeItemBase;
-	context?: DraftPatchFileChange[];
+	context?: GitFileChangeShape[];
 	dblClick: boolean;
 	altKey: boolean;
 	ctrlKey: boolean;

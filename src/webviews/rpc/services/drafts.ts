@@ -3,25 +3,16 @@
  *
  * Provides shared patch operations that any webview can reuse.
  */
-
 import { env, l10n, window } from 'vscode';
 import { uncommitted, uncommittedStaged } from '@gitlens/git/models/revision.js';
 import { Logger } from '@gitlens/utils/logger.js';
-import type { Sources } from '../../../constants.telemetry.js';
 import type { Container } from '../../../container.js';
 import { getPresentableErrorMessage } from '../../../errors.js';
-import { showPatchesView } from '../../../plus/drafts/actions.js';
-import type { Draft } from '../../../plus/drafts/models/drafts.js';
-import type { Change } from '../../plus/patchDetails/protocol.js';
-import type { RpcServiceHost, WipChange } from './types.js';
 
 const copiedPatchMessage = l10n.t("Copied patch — use 'Apply Copied Patch' in another window to apply it");
 
 export class DraftsService {
-	constructor(
-		private readonly container: Container,
-		private readonly host: RpcServiceHost,
-	) {}
+	constructor(private readonly container: Container) {}
 
 	/**
 	 * Copy a WIP patch to the clipboard for the given scope.
@@ -142,36 +133,5 @@ export class DraftsService {
 			Logger.error(ex, 'Failed to copy commit patch to clipboard');
 			void window.showErrorMessage(l10n.t('Unable to copy patch: {0}', getPresentableErrorMessage(ex)));
 		}
-	}
-	/**
-	 * Create a patch from WIP changes.
-	 *
-	 * Opens the patches view in create mode with the WIP change.
-	 */
-	createPatchFromWip(changes: WipChange, checked: boolean | 'staged'): Promise<void> {
-		if (changes == null) return Promise.resolve();
-
-		const change: Change = {
-			type: 'wip',
-			repository: {
-				name: changes.repository.name,
-				path: changes.repository.path,
-				uri: changes.repository.uri,
-			},
-			files: changes.files,
-			revision: { to: uncommitted, from: 'HEAD' },
-			checked: checked,
-		};
-
-		void showPatchesView({ mode: 'create', create: { changes: [change] } });
-		return Promise.resolve();
-	}
-
-	/**
-	 * Show a code suggestion in the patches view.
-	 */
-	showCodeSuggestion(draft: Draft, source?: Sources): Promise<void> {
-		void showPatchesView({ mode: 'view', draft: draft, source: source ?? 'inspect' });
-		return Promise.resolve();
 	}
 }

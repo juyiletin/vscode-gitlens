@@ -3,28 +3,26 @@ import { trace } from '@gitlens/utils/decorators/log.js';
 import { weakEvent } from '@gitlens/utils/event.js';
 import type { RepositoriesChangeEvent } from '../../git/gitProviderService.js';
 import { GitUri } from '../../git/gitUri.js';
-import type { CloudWorkspace } from '../../plus/workspaces/models/cloudWorkspace.js';
 import type { LocalWorkspace } from '../../plus/workspaces/models/localWorkspace.js';
-import { createCommand } from '../../system/-webview/command.js';
 import { createViewDecorationUri } from '../viewDecorationProvider.js';
 import type { WorkspacesView } from '../workspacesView.js';
 import { SubscribeableViewNode } from './abstract/subscribeableViewNode.js';
 import type { ViewNode } from './abstract/viewNode.js';
 import { ContextValues, getViewNodeId } from './abstract/viewNode.js';
-import { CommandMessageNode, MessageNode } from './common.js';
+import { MessageNode } from './common.js';
 import { RepositoryNode } from './repositoryNode.js';
 import { WorkspaceMissingRepositoryNode } from './workspaceMissingRepositoryNode.js';
 
 export class WorkspaceNode extends SubscribeableViewNode<
 	'workspace',
 	WorkspacesView,
-	CommandMessageNode | MessageNode | RepositoryNode | WorkspaceMissingRepositoryNode
+	MessageNode | RepositoryNode | WorkspaceMissingRepositoryNode
 > {
 	constructor(
 		uri: GitUri,
 		view: WorkspacesView,
 		protected override parent: ViewNode,
-		public readonly workspace: CloudWorkspace | LocalWorkspace,
+		public readonly workspace: LocalWorkspace,
 	) {
 		super('workspace', uri, view, parent);
 
@@ -48,18 +46,7 @@ export class WorkspaceNode extends SubscribeableViewNode<
 				const descriptors = await this.workspace.getRepositoryDescriptors();
 
 				if (!descriptors?.length) {
-					children.push(
-						new CommandMessageNode(
-							this.view,
-							this,
-							createCommand<[WorkspaceNode]>(
-								'gitlens.views.workspaces.addRepos',
-								l10n.t('Add Repositories...'),
-								this,
-							),
-							l10n.t('No repositories'),
-						),
-					);
+					children.push(new MessageNode(this.view, this, l10n.t('No repositories')));
 
 					this.children = children;
 					return this.children;
@@ -98,14 +85,8 @@ export class WorkspaceNode extends SubscribeableViewNode<
 	async getTreeItem(): Promise<TreeItem> {
 		const item = new TreeItem(this.workspace.name, TreeItemCollapsibleState.Collapsed);
 
-		const cloud = this.workspace.type === 'cloud';
-
 		let contextValue: string = ContextValues.Workspace;
-		if (cloud) {
-			contextValue += '+cloud';
-		} else {
-			contextValue += '+local';
-		}
+		contextValue += '+local';
 
 		let description = '';
 		if (this.workspace.current) {
@@ -113,6 +94,7 @@ export class WorkspaceNode extends SubscribeableViewNode<
 			description = l10n.t('current');
 			item.resourceUri = createViewDecorationUri('workspace', { current: true });
 		}
+
 		if (this.workspace.localPath != null) {
 			contextValue += '+hasPath';
 		}
@@ -123,24 +105,8 @@ export class WorkspaceNode extends SubscribeableViewNode<
 
 		item.id = this.id;
 		item.contextValue = contextValue;
-		item.iconPath = new ThemeIcon(this.workspace.type === 'cloud' ? 'cloud' : 'folder');
-		item.tooltip = cloud
-			? this.workspace.provider != null
-				? this.workspace.shared
-					? l10n.t(
-							'{0}\nCloud Workspace (Shared)\nProvider: {1}',
-							this.workspace.name,
-							this.workspace.provider,
-						)
-					: l10n.t('{0}\nCloud Workspace\nProvider: {1}', this.workspace.name, this.workspace.provider)
-				: this.workspace.shared
-					? l10n.t('{0}\nCloud Workspace (Shared)', this.workspace.name)
-					: l10n.t('{0}\nCloud Workspace', this.workspace.name)
-			: l10n.t('{0}\nLocal Workspace', this.workspace.name);
-
-		if (cloud && this.workspace.organizationId != null) {
-			description = this.workspace.current ? l10n.t('current, shared') : l10n.t('shared');
-		}
+		item.iconPath = new ThemeIcon('folder');
+		item.tooltip = l10n.t('{0}\nLocal Workspace', this.workspace.name);
 
 		item.description = description;
 		return item;

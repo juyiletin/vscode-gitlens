@@ -58,7 +58,6 @@ import type {
 	ResolutionContext,
 	ResolutionDescriptionKind,
 } from '../../../plus/coretools/conflict/types.js';
-import { canPurchaseAiCredits } from '../../../plus/gk/utils/subscription.utils.js';
 import { showContributorsPicker } from '../../../quickpicks/contributorsPicker.js';
 import { showReferencePicker2 } from '../../../quickpicks/referencePicker.js';
 import { showRevisionFilesPicker } from '../../../quickpicks/revisionFilesPicker.js';
@@ -158,7 +157,7 @@ import type {
 	VirtualRefShape,
 } from './graphService.js';
 import type { ResolveRunErrors } from './resolveAIUnavailable.js';
-import { classifyResolveRunErrors, findAIUnavailableError, isAIQuotaExceededError } from './resolveAIUnavailable.js';
+import { classifyResolveRunErrors } from './resolveAIUnavailable.js';
 import { getReviewDiffEndpoints } from './reviewDiffEndpoints.js';
 import { claimReviewFiles, releaseReviewFiles } from './reviewReading.js';
 import {
@@ -210,6 +209,7 @@ function toAutoRebaseRunStep(session: AutoRebaseSession): { current: number; tot
 function toAutoRebaseRunMessage(session: AutoRebaseSession): string | undefined {
 	const { progressPrefix: prefix, progressMessage: message } = session;
 	if (prefix == null) return message;
+
 	if (message == null) return prefix;
 
 	return l10n.t('{0} · {1}', prefix, message);
@@ -416,6 +416,7 @@ export class GraphInspectServices {
 				this._composeToolsForGraph.discardCachedPlan(cacheKey);
 			}
 		}
+
 		this._activeComposeCacheKeys.clear();
 		// Flush each conversation's aggregated usage so a webview teardown mid-session doesn't drop it.
 		// Snapshot the keys — the helper drops each entry as it goes, which is also why this needs no
@@ -423,17 +424,20 @@ export class GraphInspectServices {
 		for (const sessionKey of [...this._composeConversationIds.keys()]) {
 			this.endComposeConversation(sessionKey);
 		}
+
 		if (this._composeVirtual != null) {
 			this._composeVirtual.provider.dispose();
 			this._composeVirtual.registration.dispose();
 			this._composeVirtual = undefined;
 		}
+
 		this._activeResolveSessions.clear();
 		// Flush each conversation's aggregated BYOK usage report (one feature fee per session) so a
 		// webview teardown mid-session doesn't drop it.
 		for (const conversationId of this._resolveConversationIds.values()) {
 			this.endResolveConversation(conversationId);
 		}
+
 		this._resolveConversationIds.clear();
 		this._autoRebaseOwnedConversations.clear();
 		if (this._resolveVirtual != null) {
@@ -441,6 +445,7 @@ export class GraphInspectServices {
 			this._resolveVirtual.registration.dispose();
 			this._resolveVirtual = undefined;
 		}
+
 		if (this._autoRebaseVirtual != null) {
 			this._autoRebaseVirtual.provider.dispose();
 			this._autoRebaseVirtual.registration.dispose();
@@ -562,11 +567,13 @@ export class GraphInspectServices {
 						for (const tag of tags) {
 							signal?.throwIfAborted();
 							if (tag.sha === tagSha || tag.name === tagName) continue;
+
 							if (currentDate != null && (tag.date?.getTime() ?? 0) >= currentDate) continue;
 
 							const mergeBase = await svc.refs.getMergeBase(tag.sha, tagSha, undefined, signal);
 							if (mergeBase === tag.sha) return tag.name;
 						}
+
 						return undefined;
 					} catch (ex) {
 						if (isCancellationError(ex)) throw ex;
@@ -624,9 +631,11 @@ export class GraphInspectServices {
 					if (args != null) {
 						this.followReview(args.anchor);
 					}
+
 					if (!this._reviewReleased) {
 						setReviewThreads(this.container, this, args);
 					}
+
 					return Promise.resolve();
 				},
 				onReviewThreadActions: this._reviewThreadActionsEvent.subscribe(buffer, tracker, () =>
@@ -655,6 +664,7 @@ export class GraphInspectServices {
 									: l10n.t('Finding copied to clipboard');
 						window.setStatusBarMessage(l10n.t('$(check) {0}', label), 3000);
 					}
+
 					return Promise.resolve();
 				},
 				addressReviewFindingsInChat: args => this.addressReviewFindingsInChat(args),
@@ -958,6 +968,7 @@ export class GraphInspectServices {
 						signal,
 					);
 					if (signal?.aborted) return [];
+
 					return shas != null ? [...shas] : [];
 				},
 				choosePath: params => this.onTimelineChoosePath(params),
@@ -1144,6 +1155,7 @@ export class GraphInspectServices {
 					additions += f.stats.additions;
 					deletions += f.stats.deletions;
 				}
+
 				switch (f.status) {
 					case 'A':
 					case '?':
@@ -1156,6 +1168,7 @@ export class GraphInspectServices {
 						changedFiles.changed++;
 						break;
 				}
+
 				return {
 					repoPath: repoPath,
 					path: f.path,
@@ -1214,6 +1227,7 @@ export class GraphInspectServices {
 						createRevisionRange(mergeBase ?? baseRef.ref, headRef.ref, '..'),
 					);
 					if (!log?.commits?.size) return { changes: [], range: range };
+
 					return getChangesForChangelog(this.container, range, [...log.commits.values()]);
 				}),
 				{ source: 'graph', detail: 'compare' },
@@ -1485,6 +1499,7 @@ export class GraphInspectServices {
 		if (this._reviewFilesArgs != null) {
 			void this.setReviewFiles(this._reviewFilesArgs);
 		}
+
 		if (this._reviewThreadsArgs != null) {
 			setReviewThreads(this.container, this, this._reviewThreadsArgs);
 		}
@@ -1584,6 +1599,7 @@ export class GraphInspectServices {
 
 				return viaAgent;
 			}
+
 			if (response === 'cancelled' || response == null) {
 				return { error: { message: l10n.t('Orient was cancelled.') } };
 			}
@@ -1610,6 +1626,7 @@ export class GraphInspectServices {
 
 		const { agents, cliDetectionFailed } = await load.all;
 		if (agents.length === 0 && !cliDetectionFailed) return { available: false, reason: 'no-agents' };
+
 		return { available: true };
 	}
 
@@ -1624,6 +1641,7 @@ export class GraphInspectServices {
 		if (current === this._deepReviewAvailabilityChecks) {
 			void setContext('gitlens:review:canAsk', availability.available);
 		}
+
 		return availability;
 	}
 
@@ -1684,6 +1702,7 @@ export class GraphInspectServices {
 			if (availability.available && this.container.ipc.address == null) {
 				await this.container.ipc.ensureStarted();
 			}
+
 			const endpoint = this.container.ipc.address;
 			if ((!availability.available && availability.reason === 'no-channel') || endpoint == null) {
 				void window.showWarningMessage(
@@ -1693,6 +1712,7 @@ export class GraphInspectServices {
 				);
 				return { ok: false, reason: 'no-channel' };
 			}
+
 			if (!availability.available) {
 				void window.showWarningMessage(l10n.t('No supported AI agent is available in this editor.'));
 				return { ok: false, reason: availability.reason };
@@ -1777,6 +1797,7 @@ export class GraphInspectServices {
 			} else {
 				channel.reviewDelivered();
 			}
+
 			return { ok: true };
 		} catch (ex) {
 			giveUp();
@@ -1832,6 +1853,7 @@ export class GraphInspectServices {
 		if (this.container.ipc.address == null) {
 			await this.container.ipc.ensureStarted();
 		}
+
 		const endpoint = this.container.ipc.address;
 		if (endpoint == null) return undefined;
 
@@ -1907,6 +1929,7 @@ export class GraphInspectServices {
 		if (args != null) {
 			this.followReview(args.anchor);
 		}
+
 		if (this._reviewReleased) return;
 
 		if (args == null || args.paths.length === 0) {
@@ -1941,6 +1964,7 @@ export class GraphInspectServices {
 			if (!isReviewWorkingSide(args.rhs)) {
 				uris.push(side);
 			}
+
 			commentable.set(side.toString(), path);
 		}
 
@@ -1972,6 +1996,7 @@ export class GraphInspectServices {
 		if (this._reviewFiles?.activeSettling != null) {
 			clearTimeout(this._reviewFiles.activeSettling);
 		}
+
 		this._reviewFiles?.tracking.dispose();
 		this._reviewFiles = undefined;
 		releaseReviewFiles(this);
@@ -1988,6 +2013,7 @@ export class GraphInspectServices {
 			const path = this.getReviewFilePath(getTabUris(group.activeTab).modified);
 			if (path != null) return path;
 		}
+
 		return undefined;
 	}
 
@@ -1999,6 +2025,7 @@ export class GraphInspectServices {
 		for (const [absolute, path] of files.byPath) {
 			if (arePathsEqual(absolute, uri.path)) return path;
 		}
+
 		return undefined;
 	}
 
@@ -2011,6 +2038,7 @@ export class GraphInspectServices {
 			clearTimeout(files.activeSettling);
 			files.activeSettling = undefined;
 		}
+
 		if (active === files.active) return;
 
 		// Replacing a preview tab passes through a moment with no review diff active; waiting it out
@@ -2060,16 +2088,19 @@ export class GraphInspectServices {
 				if (count > 1) {
 					open(files.paths[(index + 1) % count]);
 				}
+
 				break;
 			case 'next':
 				if (count > 1) {
 					open(files.paths[(index + 1) % count]);
 				}
+
 				break;
 			case 'previous':
 				if (count > 1) {
 					open(files.paths[(index - 1 + count) % count]);
 				}
+
 				break;
 		}
 
@@ -2227,6 +2258,7 @@ export class GraphInspectServices {
 				}
 			}
 		}
+
 		if (rhs == null || !paths.size) return [...findings];
 
 		const svc = this.container.git.getRepositoryService(repoPath);
@@ -2369,6 +2401,7 @@ export class GraphInspectServices {
 				if (!diff?.contents) {
 					diff = await repo.git.diff.getDiff?.(amend.sha, undefined, undefined, cancellationSignal);
 				}
+
 				if (diff?.contents) {
 					changesOrRepo = diff.contents;
 				}
@@ -2587,9 +2620,11 @@ export class GraphInspectServices {
 					this._activeComposeCacheKeys.delete(sessionKey);
 				}
 			}
+
 			if (isCancellationError(ex) || isComposeCancelled(ex)) {
 				return { cancelled: true };
 			}
+
 			return {
 				error: {
 					message: getPresentableErrorMessage(ex),
@@ -2649,6 +2684,7 @@ export class GraphInspectServices {
 			);
 
 			if (result === 'cancelled') return { cancelled: true };
+
 			if (result == null) {
 				return { error: { message: l10n.t('AI did not return a message. Please try again.') } };
 			}
@@ -2811,6 +2847,7 @@ export class GraphInspectServices {
 			// whole run's error when it left nothing AI resolved.
 			const runErrors = await this.classifyResolveErrors(resolutions, result.errors);
 			if (resolveSignal?.aborted) return { cancelled: true };
+
 			if ('error' in runErrors) return { error: runErrors.error };
 
 			const { errors, skipped } = await this.enrichUnresolvedFiles(
@@ -2857,6 +2894,7 @@ export class GraphInspectServices {
 			};
 		} catch (ex) {
 			if (resolveSignal?.aborted || isCancellationError(ex)) return { cancelled: true };
+
 			return { error: { message: getPresentableErrorMessage(ex) } };
 		} finally {
 			disposeCancellation();
@@ -3002,6 +3040,7 @@ export class GraphInspectServices {
 			};
 		} catch (ex) {
 			if (resolveSignal?.aborted || isCancellationError(ex)) return { cancelled: true };
+
 			return { error: { message: getPresentableErrorMessage(ex) } };
 		} finally {
 			disposeCancellation();
@@ -3203,6 +3242,7 @@ export class GraphInspectServices {
 		if (existingConversation != null && existingConversation !== handoff.sessionId) {
 			this.endResolveConversation(existingConversation);
 		}
+
 		this._resolveConversationIds.set(repoPath, handoff.sessionId);
 		this._autoRebaseOwnedConversations.add(handoff.sessionId);
 
@@ -3287,6 +3327,7 @@ export class GraphInspectServices {
 					})),
 				});
 			}
+
 			return {
 				step: step.stepNumber,
 				totalSteps: step.totalSteps,
@@ -3533,6 +3574,7 @@ export class GraphInspectServices {
 				entry.committerDate = commit.committer?.date != null ? String(commit.committer.date) : undefined;
 				this.setAvatarIfCached(entry, committerEmail, sha, repoPath, 'committerAvatarUrl');
 			}
+
 			commits.push(entry);
 		}
 
@@ -3580,6 +3622,7 @@ export class GraphInspectServices {
 			if (entry.avatarUrl == null) {
 				this.setAvatarIfCached(entry, c.email, undefined, undefined);
 			}
+
 			contributors.push(entry);
 		}
 
@@ -3593,6 +3636,7 @@ export class GraphInspectServices {
 			const registration = this.container.virtualFs.registerProvider(provider);
 			this._composeVirtual = { provider: provider, registration: registration };
 		}
+
 		return this._composeVirtual;
 	}
 
@@ -3646,6 +3690,7 @@ export class GraphInspectServices {
 			);
 			this._composeToolsForGraph ??= createGraphComposeIntegration(this.container);
 		}
+
 		return this._composeToolsForGraph;
 	}
 
@@ -3656,6 +3701,7 @@ export class GraphInspectServices {
 			const registration = this.container.virtualFs.registerProvider(provider);
 			this._resolveVirtual = { provider: provider, registration: registration };
 		}
+
 		return this._resolveVirtual;
 	}
 
@@ -3672,6 +3718,7 @@ export class GraphInspectServices {
 			this._autoRebaseVirtual.provider.endAllSessions();
 			this._autoRebaseVirtual.runId = runId;
 		}
+
 		return this._autoRebaseVirtual;
 	}
 
@@ -3733,6 +3780,7 @@ export class GraphInspectServices {
 			);
 			this._conflictToolsForGraph ??= createConflictToolsIntegration(this.container);
 		}
+
 		return this._conflictToolsForGraph;
 	}
 
@@ -3743,20 +3791,16 @@ export class GraphInspectServices {
 			conversationId = uuid();
 			this._composeConversationIds.set(sessionKey, conversationId);
 		}
+
 		return conversationId;
 	}
 
-	/**
-	 * Ends a compose session's conversation — sends its accumulated usage as ONE report (the reason for
-	 * accumulating it in the first place) and drops the ID so the next compose mints a fresh one. No-op
-	 * when there's no conversation, so it's safe on every terminal path (apply, abandon, dispose).
-	 */
+	/** Ends a compose session's conversation ID so the next compose starts a fresh one. */
 	private endComposeConversation(sessionKey: ComposeSessionKey): void {
 		const conversationId = this._composeConversationIds.get(sessionKey);
 		if (conversationId == null) return;
 
 		this._composeConversationIds.delete(sessionKey);
-		void this.container.ai.flushBYOKUsage(conversationId);
 	}
 
 	/** Gets the repo's resolve-session AI conversation ID, minting one for a new session. */
@@ -3766,22 +3810,13 @@ export class GraphInspectServices {
 			conversationId = uuid();
 			this._resolveConversationIds.set(repoPath, conversationId);
 		}
+
 		return conversationId;
 	}
 
-	/**
-	 * Ends a resolve conversation's BYOK reporting — unless an automatic rebase run owns it. The panel
-	 * adopts the run's conversation when automation escalates (so retries/Refine stay in one billed
-	 * session), and the run flushes it itself on every terminal path; since each report is charged the
-	 * backend's flat per-feature fee, reporting here too would bill one run twice (once at the panel's
-	 * Apply, again when the resumed run finishes). Skipping loses nothing: a live run flushes when it
-	 * ends, and `AIProviderService.dispose` flushes whatever is still pending. Clears the ownership
-	 * mark as it goes — a re-escalation re-adopts the same conversation and marks it again.
-	 */
+	/** Ends a resolve conversation ID unless an automatic rebase run owns it. */
 	private endResolveConversation(conversationId: string): void {
-		if (this._autoRebaseOwnedConversations.delete(conversationId)) return;
-
-		void this.container.ai.flushBYOKUsage(conversationId);
+		this._autoRebaseOwnedConversations.delete(conversationId);
 	}
 
 	/** Drops the cached resolve session for a repo and ends its virtual session (no disk writes). */
@@ -3851,16 +3886,12 @@ export class GraphInspectServices {
 		}));
 	}
 
-	/** {@link classifyResolveRunErrors}, reading the subscription only when the run ran out of AI quota —
-	 *  that's the one case whose call to action depends on whether this user may buy more credits. */
-	private async classifyResolveErrors(
+	/** Collapses provider failures into one run-level notice when AI becomes unavailable. */
+	private classifyResolveErrors(
 		resolutions: readonly ConflictToolsResolution[],
 		errors: readonly { filePath: string; error: Error }[],
 	): Promise<ResolveRunErrors> {
-		const canPurchaseCredits = isAIQuotaExceededError(findAIUnavailableError(errors))
-			? canPurchaseAiCredits(await this.container.subscription.getSubscription())
-			: false;
-		return classifyResolveRunErrors(resolutions, errors, canPurchaseCredits);
+		return Promise.resolve(classifyResolveRunErrors(resolutions, errors));
 	}
 
 	/**
@@ -3881,6 +3912,7 @@ export class GraphInspectServices {
 		const fallbackInfo = (filePath: string): ConflictFallbackInfo => {
 			const info = infos?.get(filePath);
 			if (info == null) return {};
+
 			return {
 				conflictStatus: info.conflictStatus,
 				kind: info.kind,
@@ -4021,6 +4053,7 @@ export class GraphInspectServices {
 				);
 				return undefined;
 			}
+
 			return candidatePath;
 		} catch (ex) {
 			// Re-throw cancellation so the caller's `signal?.throwIfAborted()` after the await
@@ -4151,6 +4184,7 @@ export class GraphInspectServices {
 					if (value.diff?.contents) {
 						parts.push(value.diff.contents);
 					}
+
 					if (value.commit) {
 						messages.push(
 							l10n.t('{0}: {1}', shortenRevision(value.commit.sha), value.commit.message ?? ''),
@@ -4158,6 +4192,7 @@ export class GraphInspectServices {
 						commits.push({ sha: value.sha, message: value.commit.message ?? '' });
 					}
 				}
+
 				if (!parts.length) return undefined;
 
 				const context = await this.buildChangesContext(
@@ -4239,6 +4274,7 @@ export class GraphInspectServices {
 						// Best-effort: fall back to the plain unstaged diff rather than sinking the whole review.
 						Logger.error(ex, `Failed to enumerate untracked files for review`);
 					}
+
 					if (untrackedPaths?.length) {
 						signal?.throwIfAborted();
 						try {
@@ -4279,19 +4315,23 @@ export class GraphInspectServices {
 				if (d?.contents) {
 					parts.push(d.contents);
 				}
+
 				labels.push(l10n.t('unstaged'));
 			} finally {
 				await disposeScratchIndex(index);
 			}
 		}
+
 		if (scope.includeStaged) {
 			const d = await svc.diff?.getDiff?.(uncommittedStaged);
 			signal?.throwIfAborted();
 			if (d?.contents) {
 				parts.push(d.contents);
 			}
+
 			labels.push(l10n.t('staged'));
 		}
+
 		const commitMessages: string[] = [];
 		// Per-sha getDiff+getCommit are independent; parallelize the pair and across shas. allSettled
 		// preserves input order; the outer throwIfAborted re-propagates a mid-flight abort.
@@ -4313,6 +4353,7 @@ export class GraphInspectServices {
 			if (value.diff?.contents) {
 				parts.push(value.diff.contents);
 			}
+
 			if (value.commit) {
 				commitMessages.push(l10n.t('{0}: {1}', shortenRevision(value.commit.sha), value.commit.message ?? ''));
 			}
@@ -4394,6 +4435,7 @@ function isPreviewableText(content: string | undefined): boolean {
 		const code = content.charCodeAt(i);
 		if (code === 0 || code === 0xfffd) return false;
 	}
+
 	return true;
 }
 
@@ -4417,6 +4459,7 @@ function combineResolveGuidance(instructions: string | undefined): string | unde
 	const typed = instructions?.trim();
 
 	if (!setting) return typed || undefined;
+
 	if (!typed) return setting;
 
 	return `${setting}\n\nAnd here is additional guidance for this run (it takes highest priority): ${typed}`;
@@ -4437,10 +4480,12 @@ function sumResolutionEffort(resolutions: readonly ConflictToolsResolution[]): {
 		if (r.metrics?.stepCount != null) {
 			steps = (steps ?? 0) + r.metrics.stepCount;
 		}
+
 		if (r.metrics?.toolCallCount != null) {
 			toolCalls = (toolCalls ?? 0) + r.metrics.toolCallCount;
 		}
 	}
+
 	return { steps: steps, toolCalls: toolCalls };
 }
 
@@ -4464,6 +4509,7 @@ function logResolutionUsage(resolutions: readonly ConflictToolsResolution[], sco
 			scope,
 		);
 	}
+
 	if (resolutions.length > 1 && (input > 0 || output > 0)) {
 		Logger.debug(`run total: tokens=${input} in / ${output} out`, scope);
 	}

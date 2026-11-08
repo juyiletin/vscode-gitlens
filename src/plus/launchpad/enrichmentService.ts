@@ -1,5 +1,4 @@
 import type { CancellationToken, Disposable } from 'vscode';
-import { l10n } from 'vscode';
 import type { RemoteProvider, RemoteProviderId } from '@gitlens/git/models/remoteProvider.js';
 import type { IntegrationIds } from '@gitlens/integrations/constants.js';
 import {
@@ -9,184 +8,70 @@ import {
 	IssuesSelfManagedHostIntegrationId,
 } from '@gitlens/integrations/constants.js';
 import { CancellationError } from '@gitlens/utils/cancellation.js';
-import { debug } from '@gitlens/utils/decorators/log.js';
-import { getScopedLogger } from '@gitlens/utils/logger.scoped.js';
 import type { Container } from '../../container.js';
-import { AuthenticationRequiredError } from '../../errors.js';
-import type { ServerConnection } from '../gk/serverConnection.js';
-import { ensureAccount } from '../gk/utils/-webview/acount.utils.js';
 import type { EnrichableItem, EnrichedItem, EnrichedItemResponse } from './models/enrichedItem.js';
 
-type EnrichedItemRequest = {
-	provider: EnrichedItemResponse['provider'];
-	entityType: EnrichedItemResponse['entityType'];
-	entityId: string;
-	entityUrl: string;
-	expiresAt?: string;
-};
-
 export class EnrichmentService implements Disposable {
-	constructor(
-		private readonly container: Container,
-		private readonly connection: ServerConnection,
-	) {}
+	constructor(private readonly container: Container) {}
 
 	dispose(): void {}
 
-	private async delete(id: string, context: 'unpin' | 'unsnooze'): Promise<void> {
-		const scope = getScopedLogger();
+	get(type?: EnrichedItemResponse['type'], cancellation?: CancellationToken): Promise<EnrichedItem[]> {
+		if (cancellation?.isCancellationRequested) throw new CancellationError();
 
-		try {
-			const rsp = await this.connection.fetchGkApi(`v1/enrich-items/${id}`, { method: 'DELETE' });
+		const items = this.container.storage.get('launchpad:enrichedItems') ?? [];
+		const now = Date.now();
+		return Promise.resolve(
+			items.filter(item => {
+				if (type != null && item.type !== type) return false;
 
-			if (!rsp.ok) throw new Error(`Unable to ${context} item '${id}':  (${rsp.status}) ${rsp.statusText}`);
-		} catch (ex) {
-			if (ex instanceof AuthenticationRequiredError) throw ex;
-
-			scope?.error(ex);
-			debugger;
-			throw ex;
-		}
+				return item.type !== 'snooze' || item.expiresAt == null || new Date(item.expiresAt).getTime() > now;
+			}),
+		);
 	}
 
-	@debug()
-	async get(type?: EnrichedItemResponse['type'], cancellation?: CancellationToken): Promise<EnrichedItem[]> {
-		const scope = getScopedLogger();
-
-		try {
-			type Result = { data: EnrichedItemResponse[] };
-
-			const rsp = await this.connection.fetchGkApi('v1/enrich-items', { method: 'GET' });
-			if (cancellation?.isCancellationRequested) throw new CancellationError();
-
-			const result = (await rsp.json()) as Result;
-			if (cancellation?.isCancellationRequested) throw new CancellationError();
-
-			return type == null ? result.data : result.data.filter(i => i.type === type);
-		} catch (ex) {
-			if (ex instanceof AuthenticationRequiredError) return [];
-
-			scope?.error(ex);
-			debugger;
-			throw ex;
-		}
-	}
-
-	@debug()
-	getPins(cancellation?: CancellationToken): Promise<EnrichedItem[]> {
-		return this.get('pin', cancellation);
-	}
-
-	@debug()
-	getSnoozed(cancellation?: CancellationToken): Promise<EnrichedItem[]> {
-		return this.get('snooze', cancellation);
-	}
-
-	@debug({ args: item => ({ item: `${item.id} (${item.provider} ${item.type})` }) })
 	async pinItem(item: EnrichableItem): Promise<EnrichedItem> {
-		const scope = getScopedLogger();
-
-		try {
-			if (
-				!(await ensureAccount(this.container, l10n.t('Pinning is a Preview feature and requires an account.'), {
-					source: 'launchpad',
-					detail: 'pin',
-				}))
-			) {
-				throw new Error('Unable to pin item: account required');
-			}
-
-			type Result = { data: EnrichedItemResponse };
-
-			const rq: EnrichedItemRequest = {
-				provider: item.provider,
-				entityType: item.type,
-				entityId: item.id,
-				entityUrl: item.url,
-			};
-
-			const rsp = await this.connection.fetchGkApi('v1/enrich-items/pin', {
-				method: 'POST',
-				body: JSON.stringify(rq),
-			});
-
-			if (!rsp.ok) {
-				throw new Error(
-					`Unable to pin item '${rq.provider}|${rq.entityUrl}#${item.id}':  (${rsp.status}) ${rsp.statusText}`,
-				);
-			}
-
-			const result = (await rsp.json()) as Result;
-			return result.data;
-		} catch (ex) {
-			if (ex instanceof AuthenticationRequiredError) throw ex;
-
-			scope?.error(ex);
-			debugger;
-			throw ex;
-		}
+		return this.upsert('pin', item);
 	}
 
-	@debug()
 	unpinItem(id: string): Promise<void> {
-		return this.delete(id, 'unpin');
+		return this.delete(id, 'pin');
 	}
 
-	@debug({ args: item => ({ item: `${item.id} (${item.provider} ${item.type})` }) })
 	async snoozeItem(item: EnrichableItem): Promise<EnrichedItem> {
-		const scope = getScopedLogger();
-
-		try {
-			if (
-				!(await ensureAccount(
-					this.container,
-					l10n.t('Snoozing is a Preview feature and requires an account.'),
-					{
-						source: 'launchpad',
-						detail: 'snooze',
-					},
-				))
-			) {
-				throw new Error('Unable to snooze item: subscription required');
-			}
-
-			type Result = { data: EnrichedItemResponse };
-
-			const rq: EnrichedItemRequest = {
-				provider: item.provider,
-				entityType: item.type,
-				entityId: item.id,
-				entityUrl: item.url,
-			};
-			if (item.expiresAt != null) {
-				rq.expiresAt = item.expiresAt;
-			}
-
-			const rsp = await this.connection.fetchGkApi('v1/enrich-items/snooze', {
-				method: 'POST',
-				body: JSON.stringify(rq),
-			});
-
-			if (!rsp.ok) {
-				throw new Error(
-					`Unable to snooze item '${rq.provider}|${rq.entityUrl}#${item.id}':  (${rsp.status}) ${rsp.statusText}`,
-				);
-			}
-
-			const result = (await rsp.json()) as Result;
-			return result.data;
-		} catch (ex) {
-			if (ex instanceof AuthenticationRequiredError) throw ex;
-
-			scope?.error(ex);
-			debugger;
-			throw ex;
-		}
+		return this.upsert('snooze', item);
 	}
 
-	@debug()
 	unsnoozeItem(id: string): Promise<void> {
-		return this.delete(id, 'unsnooze');
+		return this.delete(id, 'snooze');
+	}
+
+	private async upsert(type: EnrichedItemResponse['type'], item: EnrichableItem): Promise<EnrichedItem> {
+		const stored = this.container.storage.get('launchpad:enrichedItems') ?? [];
+		const id = `local:${type}:${item.provider}:${item.type}:${item.id}:${encodeURIComponent(item.url)}`;
+		const previous = stored.find(i => i.id === id);
+		const now = new Date().toISOString();
+		const updated: EnrichedItem = {
+			id: id,
+			type: type,
+			provider: item.provider,
+			entityType: item.type,
+			entityId: item.id,
+			entityUrl: item.url,
+			createdAt: previous?.createdAt ?? now,
+			updatedAt: now,
+			expiresAt: item.expiresAt,
+		};
+		await this.container.storage.store('launchpad:enrichedItems', [...stored.filter(i => i.id !== id), updated]);
+		return updated;
+	}
+
+	private async delete(id: string, type: EnrichedItemResponse['type']): Promise<void> {
+		const stored = this.container.storage.get('launchpad:enrichedItems') ?? [];
+		await this.container.storage.store(
+			'launchpad:enrichedItems',
+			stored.filter(item => item.id !== id || item.type !== type),
+		);
 	}
 }
 
@@ -214,17 +99,9 @@ const supportedIntegrationIdsToEnrich: Record<IntegrationIds, EnrichedItemRespon
 	[GitSelfManagedHostIntegrationId.CloudGitLabSelfHosted]: 'gitlab',
 	[GitSelfManagedHostIntegrationId.BitbucketServer]: 'bitbucket',
 	[IssuesCloudHostIntegrationId.Jira]: 'jira',
-	// Collapsed onto the cloud provider, like every self-hosted id above it: the enrich backend
-	// (`gitkraken/drafts-service`) validates `provider` against a fixed set that has no self-hosted member, so
-	// a `jira-server` value would be rejected outright. Safe because `provider` doesn't identify the entity —
-	// the host travels inside `entityId` (an encoded entity identifier carrying the provider AND domain) and
-	// `entityUrl`, which are what the backend hashes for uniqueness, so two Jira instances can't collide.
-	// gitkraken.dev maps all five self-hosted ids the same way, calling the enrich API "inconsistent".
 	[IssuesSelfManagedHostIntegrationId.JiraServer]: 'jira',
 	[IssuesCloudHostIntegrationId.Linear]: 'linear',
 	[IssuesCloudHostIntegrationId.Trello]: 'trello',
-	// Not enrichable until the enrich backend accepts an `asana` provider: it validates `provider` against a fixed
-	// set, so sending one it doesn't know would be rejected rather than pinned or snoozed.
 	[IssuesCloudHostIntegrationId.Asana]: undefined,
 };
 
@@ -235,6 +112,7 @@ export function convertRemoteProviderToEnrichProvider(provider: RemoteProvider):
 export function convertRemoteProviderIdToEnrichProvider(id: RemoteProviderId): EnrichedItemResponse['provider'] {
 	const enrichProvider = supportedRemoteProvidersToEnrich[id];
 	if (enrichProvider == null) throw new Error(`Unknown remote provider '${id}'`);
+
 	return enrichProvider;
 }
 
@@ -249,5 +127,6 @@ export function isEnrichableIntegrationId(id: IntegrationIds): boolean {
 export function convertIntegrationIdToEnrichProvider(id: IntegrationIds): EnrichedItemResponse['provider'] {
 	const enrichProvider = supportedIntegrationIdsToEnrich[id];
 	if (enrichProvider == null) throw new Error(`Unknown integration id '${id}'`);
+
 	return enrichProvider;
 }

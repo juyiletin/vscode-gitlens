@@ -7,8 +7,6 @@ import { filterMap } from '@gitlens/utils/array.js';
 import { Logger } from '@gitlens/utils/logger.js';
 import type { SuppressedMessages } from './config.js';
 import { urls } from './constants.js';
-import type { Source } from './constants.telemetry.js';
-import type { Container } from './container.js';
 import { getPresentableErrorMessage } from './errors.js';
 import { formatIdentityDisplayName, getCommitFormattedDate } from './git/utils/-webview/commit.utils.js';
 import { executeCommand, executeCoreCommand } from './system/-webview/command.js';
@@ -48,6 +46,7 @@ export function showCommitHasNoPreviousCommitWarningMessage(commit?: GitCommit):
 	if (commit == null) {
 		return showMessage('info', l10n.t('There is no previous commit.'), 'suppressCommitHasNoPreviousCommitWarning');
 	}
+
 	return showMessage(
 		'info',
 		l10n.t(
@@ -130,6 +129,7 @@ function escapeShellArg(arg: string): string {
 		// Escape single quotes by replacing ' with '\''
 		return `'${arg.replace(/'/g, "'\\''")}'`;
 	}
+
 	return arg;
 }
 
@@ -198,6 +198,7 @@ export async function showGitErrorMessage(
 		} else {
 			void executeCommand('gitlens.enableDebugLogging');
 		}
+
 		return undefined;
 	}
 
@@ -400,6 +401,7 @@ export async function showWhatsNewMessage(majorVersion: string): Promise<void> {
 	if (majorVersion === '18') {
 		actions.push(openWalkthrough);
 	}
+
 	actions.push(confirm);
 
 	const result = await showMessage('info', message, undefined, null, ...actions);
@@ -410,73 +412,6 @@ export async function showWhatsNewMessage(majorVersion: string): Promise<void> {
 		void executeCommand('gitlens.showWelcomeView', { mode: 'graph' });
 	} else if (result === openGraph) {
 		void executeCommand('gitlens.showGraphView');
-	}
-}
-
-export async function showMcpMessage(container: Container, _current: string): Promise<void> {
-	const isAutoInstallable = container.gkMcp?.isRegistrationAllowed ?? false;
-	const confirm = { title: l10n.t('OK'), isCloseAffordance: true };
-	const learnMore = { title: l10n.t('Learn More') };
-	const connectMore = { title: l10n.t('Connect More Agents') };
-	const install = { title: l10n.t('Install GitKraken MCP') };
-
-	let result: MessageItem | undefined;
-	if (isAutoInstallable) {
-		result = await showMessage(
-			'info',
-			l10n.t(
-				'GitLens adds the GitKraken MCP into your AI chat, leveraging Git and your integrations to provide context and perform actions. You can also connect MCP to other agents on your machine.',
-			),
-			undefined,
-			null,
-			connectMore,
-			learnMore,
-			confirm,
-		);
-	} else {
-		result = await showMessage(
-			'info',
-			l10n.t(
-				'Allow GitLens to add the GitKraken MCP into your AI chat, leveraging Git and your integrations (issues, PRs, etc) to provide context and perform actions. Saving you time and context switching.',
-			),
-			undefined,
-			null,
-			install,
-			learnMore,
-			confirm,
-		);
-	}
-
-	if (result === install) {
-		void executeCommand<Source>('gitlens.ai.mcp.install', { source: 'mcp-welcome-message' });
-	}
-
-	if (result === connectMore) {
-		void executeCommand<Source>('gitlens.ai.mcp.installForAllAgents', { source: 'mcp-welcome-message' });
-	}
-
-	if (result === learnMore) {
-		void openUrl(urls.helpCenterMCP);
-	}
-}
-
-export async function showCursorMcpCleanupMessage(): Promise<void> {
-	const learnMore = { title: l10n.t('Learn More') };
-	const confirm = { title: l10n.t('OK'), isCloseAffordance: true };
-
-	const result = await showMessage(
-		'info',
-		l10n.t(
-			'GitLens now registers the GitKraken MCP automatically in Cursor. You may have a duplicate entry in your Cursor `mcp.json` — remove `mcpServers.GitKraken` to clean it up.',
-		),
-		undefined,
-		null,
-		learnMore,
-		confirm,
-	);
-
-	if (result === learnMore) {
-		void openUrl(urls.helpCenterMCP);
 	}
 }
 

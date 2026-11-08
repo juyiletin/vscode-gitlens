@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 ### Added
 
+- Adds local Pro feature access in this fork without a GitKraken account, subscription server, or expiration; keeps local Git tools and user-configured AI providers
 - Adds review sessions to the _Commit Graph_'s _Review Changes_ mode &mdash; a review is now something you work through, with or without AI, rather than a one-off AI report ([gitkraken/vscode-gitlens-private#100](https://github.com/gitkraken/vscode-gitlens-private/issues/100))
   - Adds a checklist of the changed files that tracks what you've viewed and brings back any file that changes afterward
   - Adds reading controls to the diff editor that step through the review's files in order
@@ -32,12 +33,14 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 ### Changed
 
+- Changes hosting and issue integrations in this fork to authenticate directly with VS Code or user-provided credentials; native sessions follow VS Code sign-out and token changes
 - Changes GitLens webviews and the _Commit Graph_ to follow your theme more closely &mdash; banner text, the Graph's search box and amend button, autocomplete dropdowns, and info, success and warning marks now use your theme's colors instead of fixed ones ([#5400](https://github.com/gitkraken/vscode-gitlens/issues/5400))
 - Changes the Pro feature gates, badges, and upgrade prompts to offer _Upgrade to Pro_ alongside _Reactivate Pro Trial_, so an account the server won't reactivate still has a path to Pro ([#6010](https://github.com/gitkraken/vscode-gitlens/issues/6010))
 - Improves starting a task or review in Kepler when using Remote - SSH or WSL &mdash; Kepler now opens on the machine you're working on, so the task lands in the Kepler window connected to it ([#5760](https://github.com/gitkraken/vscode-gitlens/issues/5760))
 
 ### Fixed
 
+- Fixes background agent-session polling attempting to run an unconfigured GitKraken CLI in this fork while keeping local IPC session tracking available
 - Fixes AI conflict resolution with Copilot starting every remaining file after hitting Copilot's usage or rate limit, or when the selected model is no longer available &mdash; it now stops and says why, naming Copilot's own limit or offering to switch models ([#6118](https://github.com/gitkraken/vscode-gitlens/issues/6118), [#6145](https://github.com/gitkraken/vscode-gitlens/issues/6145))
 - Fixes AI conflict resolution sending a request for every remaining file after AI becomes unavailable (e.g. the weekly AI allowance runs out or the provider rejects its API key) &mdash; it now stops and shows one message explaining why, and the _Commit Graph_'s _Resolve_ mode chooses the AI model once per run
 - Fixes _Retry_ and _Refine_ in the _Commit Graph_'s _Resolve_ mode dropping _Apply & Resume with AI_ while an automatic rebase is still paused
@@ -82,6 +85,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
   - Fixes links in the Pro feature badge's popup showing as plain text
   - Fixes radio buttons and the checkboxes in the _Commit Graph_'s popovers ignoring the theme's radio and checkbox border colors
   - Fixes the branch status icon using fixed gray colors instead of following the theme's text color
+
+### Removed
+
+- Removes GitKraken cloud patches, cloud workspaces, organization services, hosted AI, notification inbox, telemetry export, and bundled MCP/CLI installation from this fork
 
 ## [19.5.0] - 2026-10-27
 

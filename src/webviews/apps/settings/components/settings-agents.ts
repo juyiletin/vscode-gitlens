@@ -5,7 +5,6 @@ import { css, html, LitElement, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { srOnly } from '@gitlens/components/components/styles/lit/a11y.css.js';
 import { boxSizingBase, inlineCode, linkBase } from '@gitlens/components/components/styles/lit/base.css.js';
-import { createCommandLink } from '../../../../system/commands.js';
 import type { AgentInfo, AIState } from '../../../rpc/services/types.js';
 import { shouldShowKeplerBanner } from '../../shared/components/keplerBanner.utils.js';
 import type { SettingsActions } from '../actions.js';
@@ -39,28 +38,6 @@ const kindIcons: Record<AgentInfo['kind'], string> = {
 	editor: 'robot',
 };
 
-/** Splits an activation hint on the markdown-style backtick spans it is authored with: even indices
- *  are plain text, odd indices are the code spans. One split serves both the rendered form and the
- *  plain accessible name, so the convention is expressed once.
- *
- *  Deliberately local rather than shared with the host's `stripHintCodeMarkers`: the rendered form
- *  needs Lit, and `src/agents/utils/` is host-only per AGENTS.md — a webview may not import it. */
-function splitHintCodeSpans(hint: string): string[] {
-	return hint.split(/`([^`]+)`/g);
-}
-
-/** The hint with its code spans rendered as inline code. */
-function renderHintWithInlineCode(hint: string): unknown[] {
-	return splitHintCodeSpans(hint).map((part, i) =>
-		i % 2 === 1 ? html`<span class="inline-code">${part}</span>` : part,
-	);
-}
-
-/** The hint as plain text, for an accessible name — the backticks would be read out literally. */
-function hintPlainText(hint: string): string {
-	return splitHintCodeSpans(hint).join('');
-}
-
 /**
  * The Agents settings table — one row per detected agent (Chat/Extension/CLI),
  * with a Default picker and, for CLI agents only, MCP/Hooks install controls.
@@ -83,7 +60,7 @@ export class GlSettingsAgents extends SignalWatcher(LitElement) {
 
 			.rows {
 				display: grid;
-				grid-template-columns: 1fr auto auto auto;
+				grid-template-columns: 1fr auto;
 				gap: var(--gl-space-4) var(--gl-space-16);
 				align-items: center;
 			}
@@ -252,6 +229,7 @@ export class GlSettingsAgents extends SignalWatcher(LitElement) {
 		const ai = this.ai;
 		if (ai == null) {
 			if (this._state.serviceErrors.get().ai) return this.renderError(l10n.t('Couldn’t load AI status.'));
+
 			return html`<skeleton-loader lines="4"></skeleton-loader>`;
 		}
 
@@ -276,6 +254,7 @@ export class GlSettingsAgents extends SignalWatcher(LitElement) {
 		const agents = this.agents;
 		if (agents == null) {
 			if (this._state.serviceErrors.get().agents) return this.renderError(l10n.t('Couldn’t load agents.'));
+
 			return html`<skeleton-loader lines="4"></skeleton-loader>`;
 		}
 
@@ -296,16 +275,6 @@ export class GlSettingsAgents extends SignalWatcher(LitElement) {
 				<gl-tooltip content=${l10n.t('The agent GitLens uses by default for AI features')}
 					><span class="header__col">${l10n.t('Default')}</span></gl-tooltip
 				>
-				<gl-tooltip
-					content=${l10n.t(
-						"GitKraken's MCP server gives this agent access to GitLens tools and repository context",
-					)}
-					><span class="header__col">MCP</span></gl-tooltip
-				>
-				<gl-tooltip
-					content=${l10n.t("GitKraken hooks let GitLens track this agent's sessions and coordinate permissions")}
-					><span class="header__col">${l10n.t('Hooks')}</span></gl-tooltip
-				>
 			</div>
 			${kindOrder.map(kind =>
 				this.renderSection(
@@ -318,6 +287,7 @@ export class GlSettingsAgents extends SignalWatcher(LitElement) {
 
 	private renderSection(kind: AgentInfo['kind'], list: AgentInfo[]) {
 		if (list.length === 0) return nothing;
+
 		return html`<div class="section">${kindLabels[kind]}</div>
 			${list.map(a => this.renderRow(a))}`;
 	}
@@ -347,204 +317,11 @@ export class GlSettingsAgents extends SignalWatcher(LitElement) {
 								>
 							</gl-radio>`
 			}
-			<span class="cell"
-				>${notDetected ? this.renderDash(l10n.t('Not detected')) : this.renderMcpCell(agent)}</span
-			>
-			<span class="cell"
-				>${notDetected ? this.renderDash(l10n.t('Not detected')) : this.renderHooksCell(agent)}</span
-			>
 		</div>`;
 	}
 
 	private setDefault(id: string): void {
 		void this.actions?.applyValue('ai.defaultAgent', id);
-	}
-
-	private renderMcpCell(agent: AgentInfo) {
-		if (agent.kind === 'editor' || agent.kind === 'ide-chat') return this.renderEditorMcpCell();
-
-		// The Claude Code Extension runs on the Claude Code CLI — reflect the CLI's install state read-only;
-		// the actual install/uninstall controls live on the CLI row.
-		if (agent.kind === 'claude-extension') {
-			return agent.mcp?.installed
-				? this.renderInstalledViaCli()
-				: this.renderDash(l10n.t('GitKraken MCP not installed via the Claude Code CLI'));
-		}
-
-		const mcp = agent.mcp;
-		if (agent.kind !== 'cli' || mcp == null || !mcp.supported) {
-			return this.renderDash(l10n.t('MCP not available'));
-		}
-		if (mcp.installed) {
-			return this.renderInstalled(
-				createCommandLink<{ agentId: string; source: string }>('gitlens.ai.mcp.uninstallForAgent', {
-					agentId: agent.id,
-					source: 'settings',
-				}),
-				l10n.t('Uninstall GitKraken MCP for {agent}', { agent: agent.label }),
-			);
-		}
-		return html`<gl-button
-			class="cell__button"
-			appearance="secondary"
-			href="${createCommandLink<{ agentId: string; source: string }>('gitlens.ai.mcp.installForAgent', {
-				agentId: agent.id,
-				source: 'settings',
-			})}"
-			aria-label=${l10n.t('Install GitKraken MCP for {agent}', { agent: agent.label })}
-			tooltip=${l10n.t('Install GitKraken MCP for {agent}', { agent: agent.label })}
-			><code-icon icon="plug" aria-hidden="true"></code-icon
-		></gl-button>`;
-	}
-
-	private renderEditorMcpCell() {
-		const mcp = this.ai?.mcp;
-		if (mcp == null || !mcp.capable) {
-			return this.renderDash(l10n.t('GitKraken MCP is not available in this editor'));
-		}
-
-		if (mcp.bundled) {
-			return html`<span class="cell__status">
-				<gl-tooltip content=${l10n.t('GitKraken MCP is available in this editor')}
-					><code-icon
-						icon="check"
-						aria-label=${l10n.t('GitKraken MCP is available in this editor')}
-					></code-icon
-				></gl-tooltip>
-				<gl-button
-					class="cell__button"
-					appearance="secondary"
-					aria-label=${l10n.t('Disable the bundled GitKraken MCP server for this editor')}
-					tooltip=${l10n.t('Disable the bundled GitKraken MCP server for this editor')}
-					@click=${() => this.actions?.applyValue('gitkraken.mcp.autoEnabled', false)}
-					><code-icon icon="gl-unplug" aria-hidden="true"></code-icon
-				></gl-button>
-			</span>`;
-		}
-		return html`<gl-button
-			class="cell__button"
-			appearance="secondary"
-			aria-label=${l10n.t('Enable the bundled GitKraken MCP server for this editor')}
-			tooltip=${l10n.t('Enable the bundled GitKraken MCP server for this editor')}
-			@click=${() => this.actions?.applyValue('gitkraken.mcp.autoEnabled', true)}
-			><code-icon icon="plug" aria-hidden="true"></code-icon
-		></gl-button>`;
-	}
-
-	/** The activation warning: a popover rather than a tooltip, because its content is actionable.
-	 *  A tooltip closes as soon as the pointer leaves its anchor, so a link inside one is
-	 *  unreachable; `gl-popover` keeps the content hoverable, which is why every other actionable
-	 *  overlay in the webviews uses it. */
-	private renderManualActivation(hint: string, startSession?: { href: string; agentLabel: string }) {
-		return html`<gl-popover>
-			<code-icon
-				slot="anchor"
-				class="cell__status-icon--warning"
-				icon="warning"
-				tabindex="0"
-				aria-label="${hintPlainText(hint)}"
-			></code-icon>
-			<div slot="content" class="activation-popover">
-				<span>${renderHintWithInlineCode(hint)}</span>
-				${
-					startSession != null
-						? html`<gl-button
-								appearance="secondary"
-								href="${startSession.href}"
-								aria-label=${l10n.t('Start {agent} Session', { agent: startSession.agentLabel })}
-								>${l10n.t('Start {agent} Session', { agent: startSession.agentLabel })}</gl-button
-							>`
-						: nothing
-				}
-			</div>
-		</gl-popover>`;
-	}
-
-	private renderInstalled(
-		uninstallHref: string,
-		uninstallLabel: string,
-		manualActivationHint?: string,
-		startSession?: { href: string; agentLabel: string },
-	) {
-		return html`<span class="cell__status">
-			<gl-tooltip content=${l10n.t('Installed')}
-				><code-icon icon="check" aria-label=${l10n.t('Installed')}></code-icon
-			></gl-tooltip>
-			${manualActivationHint != null ? this.renderManualActivation(manualActivationHint, startSession) : nothing}
-			<gl-button
-				class="cell__button"
-				appearance="secondary"
-				href="${uninstallHref}"
-				aria-label="${uninstallLabel}"
-				tooltip="${uninstallLabel}"
-				><code-icon icon="gl-unplug" aria-hidden="true"></code-icon
-			></gl-button>
-		</span>`;
-	}
-
-	/** Read-only installed check for state managed elsewhere (e.g. the Claude Code Extension reflecting
-	 *  the Claude Code CLI) — no uninstall control, since it isn't managed from this row. */
-	private renderInstalledViaCli() {
-		return html`<span class="cell__status">
-			<gl-tooltip content=${l10n.t('Installed via Claude Code CLI')}
-				><code-icon icon="check" aria-label=${l10n.t('Installed via Claude Code CLI')}></code-icon
-			></gl-tooltip>
-		</span>`;
-	}
-
-	private renderHooksCell(agent: AgentInfo) {
-		const hooks = agent.hooks;
-		// The Claude Code Extension reflects the Claude Code CLI's hooks state read-only (managed on the CLI row).
-		if (agent.kind === 'claude-extension') {
-			return hooks?.installed
-				? this.renderInstalledViaCli()
-				: this.renderDash(l10n.t('GitKraken hooks not installed via the Claude Code CLI'));
-		}
-
-		if (
-			(agent.kind !== 'cli' && agent.kind !== 'editor' && agent.kind !== 'ide-chat') ||
-			hooks == null ||
-			!hooks.supported
-		) {
-			return this.renderDash(l10n.t('Hooks not available'));
-		}
-
-		const agentId = agent.hooksAgentId ?? agent.id;
-		if (hooks.installed) {
-			// The "start a session" action needs a `cli:${name}` descriptor id to hand `startAgentSession`
-			// — `agent.id` IS that id for a CLI row, but for an IDE-host row (e.g. `ide-chat`) it is not,
-			// which is exactly why `hooksAgentId` exists above. No agent has a hint on a non-CLI row
-			// today, but gate on `kind` anyway so that stays true if one shows up later.
-			const startSession =
-				hooks.manualActivation != null && agent.kind === 'cli'
-					? {
-							href: createCommandLink<{ agentId: string }>('gitlens.startAgentSession', {
-								agentId: agent.id,
-							}),
-							agentLabel: agent.label,
-						}
-					: undefined;
-			return this.renderInstalled(
-				createCommandLink<{ agentId: string; source: string }>('gitlens.agents.uninstallHooksForAgent', {
-					agentId: agentId,
-					source: 'settings',
-				}),
-				l10n.t('Uninstall GitKraken Hooks for {agent}', { agent: agent.label }),
-				hooks.manualActivation,
-				startSession,
-			);
-		}
-		return html`<gl-button
-			class="cell__button"
-			appearance="secondary"
-			href="${createCommandLink<{ agentId: string; source: string }>('gitlens.agents.installHooksForAgent', {
-				agentId: agentId,
-				source: 'settings',
-			})}"
-			aria-label=${l10n.t('Install GitKraken Hooks for {agent}', { agent: agent.label })}
-			tooltip=${l10n.t('Install GitKraken Hooks for {agent}', { agent: agent.label })}
-			><code-icon icon="plug" aria-hidden="true"></code-icon
-		></gl-button>`;
 	}
 
 	private renderDash(label: string) {

@@ -6,7 +6,6 @@ import { customElement, property } from 'lit/decorators.js';
 import { focusOutlineButton, srOnly } from '@gitlens/components/components/styles/lit/a11y.css.js';
 import { boxSizingBase, linkBase } from '@gitlens/components/components/styles/lit/base.css.js';
 import { localizedContent } from '@gitlens/components/localizedContent.js';
-import { formatUnreadCount } from '@gitlens/notifications/presentation.js';
 import { formatPlural } from '@gitlens/utils/plural.js';
 import type { AutolinkConfig } from '../../../../config.js';
 import type { SubscriptionContextState } from '../../shared/contexts/subscription.js';
@@ -194,6 +193,7 @@ export class GlSettingsNav extends SignalWatcher(LitElement) {
 			const current = String(value);
 			return value !== null && String(c.valueOff) !== current;
 		}
+
 		return Boolean(value);
 	}
 
@@ -220,6 +220,7 @@ export class GlSettingsNav extends SignalWatcher(LitElement) {
 
 	private isOn(category: SettingsCategory, counts: { on: number; total: number } | undefined): boolean | undefined {
 		if (category.master != null) return this.isCheckOn(category.master);
+
 		if (counts == null) return undefined;
 
 		return counts.on > 0;
@@ -238,38 +239,8 @@ export class GlSettingsNav extends SignalWatcher(LitElement) {
 		// Signed-in cue for the Account section — placeholder pip until the subscription resolves
 		if (category.controls.some(c => c.kind === 'account')) {
 			if (this._subscription.subscription.get() === undefined) return { on: undefined };
-			return { on: this._subscription.hasAccount.get() };
-		}
 
-		if (category.controls.some(c => c.kind === 'notifications')) {
-			const notifications = this._state.notifications.get();
-			// Still loading (nothing cached and the first fetch hasn't finished) — placeholder pip, no count
-			if (
-				notifications == null ||
-				(notifications.access === 'signedIn' &&
-					notifications.lastSyncedAt == null &&
-					notifications.status !== 'error')
-			) {
-				return { on: undefined };
-			}
-
-			// Signed out: there is nothing to count
-			if (notifications.access !== 'signedIn') return { on: false };
-
-			const unread = notifications.unreadCount;
-			return {
-				on: unread > 0,
-				count: {
-					// A visible zero is noise; the pip says there's nothing unread (the aria text still does)
-					label: unread > 0 ? formatUnreadCount(unread) : '',
-					aria:
-						unread === 0
-							? l10n.t('No unread')
-							: unread > 99
-								? l10n.t('More than 99 unread')
-								: l10n.t('{count} unread', { count: unread }),
-				},
-			};
+			return { on: this._subscription.subscription.get()?.plan.effective.id === 'pro' };
 		}
 
 		if (category.controls.some(c => c.kind === 'integrations')) {
@@ -449,6 +420,7 @@ export class GlSettingsNav extends SignalWatcher(LitElement) {
 				group = [];
 				groups.set(match.category.group, group);
 			}
+
 			group.push(match);
 		}
 
@@ -533,6 +505,7 @@ export class GlSettingsNav extends SignalWatcher(LitElement) {
 				return html`<img class="item__avatar" src=${avatar} alt="" aria-hidden="true" />`;
 			}
 		}
+
 		return html`<code-icon icon=${category.icon} aria-hidden="true"></code-icon>`;
 	}
 }

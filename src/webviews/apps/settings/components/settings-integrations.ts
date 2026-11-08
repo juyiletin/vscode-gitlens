@@ -180,6 +180,7 @@ export class GlSettingsIntegrations extends SignalWatcher(LitElement) {
 					>
 				</div>`;
 			}
+
 			return html`<skeleton-loader lines="5"></skeleton-loader>`;
 		}
 
@@ -251,11 +252,14 @@ export class GlSettingsIntegrations extends SignalWatcher(LitElement) {
 					showLock
 						? html`<gl-button
 								appearance="secondary"
-								href="${createCommandLink<SubscriptionUpgradeCommandArgs>('gitlens.plus.upgrade', {
-									plan: 'pro',
-									source: 'settings',
-									detail: 'integrations',
-								})}"
+								href="${createCommandLink<SubscriptionUpgradeCommandArgs>(
+									'gitlens.showSettingsPage!account',
+									{
+										plan: 'pro',
+										source: 'settings',
+										detail: 'integrations',
+									},
+								)}"
 								tooltip=${l10n.t('Unlock {integration} features with GitLens Pro', {
 									integration: integration.name,
 								})}
@@ -307,6 +311,7 @@ function getIntegrationDetails(integration: IntegrationStateInfo): string {
 	const features = integration.supports.map(feature => featureLabels.get(feature) ?? feature);
 
 	if (features.length === 0) return '';
+
 	return l10n.t('Supports {features}', {
 		features: new Intl.ListFormat(undefined, { style: 'long', type: 'conjunction' }).format(features),
 	});

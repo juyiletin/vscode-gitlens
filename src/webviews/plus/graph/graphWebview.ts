@@ -120,7 +120,6 @@ import { stageConflictResolution } from '../../../git/utils/-webview/conflictRes
 import { getRemoteProviderUrl, remoteSupportsIntegration } from '../../../git/utils/-webview/remote.utils.js';
 import { sortRepositories } from '../../../git/utils/-webview/sorting.js';
 import { getSiblingWorktreeBranches, getWorktreesByBranch } from '../../../git/utils/-webview/worktree.utils.js';
-import { getFeedbackIssueUrl } from '../../../plus/gk/feedbackService.js';
 import type { Subscription } from '../../../plus/gk/models/subscription.js';
 import type { FeaturePreviewChangeEvent, SubscriptionChangeEvent } from '../../../plus/gk/subscriptionService.js';
 import {
@@ -143,7 +142,6 @@ import { onDidChangeContext, setContext } from '../../../system/-webview/context
 import { isFolderUri } from '../../../system/-webview/path.js';
 import type { StorageChangeEvent } from '../../../system/-webview/storage.js';
 import { isDarkTheme, isLightTheme } from '../../../system/-webview/vscode.js';
-import { openUrl } from '../../../system/-webview/vscode/uris.js';
 import { getWebviewCommand } from '../../../system/decorators/command.js';
 import { gate } from '../../../system/decorators/gate.js';
 import { serializeWebviewItemContext } from '../../../system/webview.js';
@@ -169,7 +167,6 @@ import type { EventVisibilityBuffer, SubscriptionTracker } from '../../rpc/event
 import { createRpcEvent } from '../../rpc/eventVisibilityBuffer.js';
 import { LaunchpadService } from '../../rpc/launchpadService.js';
 import { createSharedServices } from '../../rpc/services/common.js';
-import { NotificationsRpcService } from '../../rpc/services/notifications.js';
 import { proxyServices } from '../../rpc/services/proxy.js';
 import { WalkthroughService } from '../../rpc/walkthroughService.js';
 import type { WebviewHost, WebviewProvider, WebviewShowingArgs } from '../../webviewProvider.js';
@@ -191,11 +188,8 @@ import { GraphProducersService } from './graphProducersService.js';
 import type { GraphSearchServiceContext } from './graphSearchService.js';
 import { GraphSearchService } from './graphSearchService.js';
 import type {
-	DidRequestShowFeedbackParams,
 	GraphAccessState,
 	GraphColumnsState,
-	GraphFeedbackInput,
-	GraphFeedbackResult,
 	GraphFiltersState,
 	GraphRepoStatus,
 	GraphServices,
@@ -325,10 +319,6 @@ function hasCompare(arg: any): arg is { repository: GlRepository; compare: Graph
 
 function hasSidebarPanel(arg: any): arg is { sidebarPanel: GraphSidebarPanel } {
 	return typeof arg?.sidebarPanel === 'string';
-}
-
-function hasFeedback(arg: any): arg is { feedback: true; source?: Source } {
-	return arg?.feedback === true;
 }
 
 function hasVisualization(
@@ -712,6 +702,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 							}
 						}
 					}
+
 					if (removed.length === 0 && (added.length === 0 || added.every(r => r.isWorktree))) {
 						this._etag = this.container.git.etag;
 						return;
@@ -964,6 +955,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 				if (result != null) {
 					this._wip.onWipServedOutOfBand(repo, result.wip.revision);
 				}
+
 				return result;
 			},
 			getSearchContext: sha => this._searchService.getSearchContext(sha),
@@ -1132,10 +1124,6 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 	private readonly _gitHealthChangedEvent = createRpcEvent<{ repoPath: string }>('gitHealthChanged', 'signal');
 	// `signal`: the toolbar command that fires this is only reachable from a visible graph, so there is
 	// no cold/hidden path to buffer for.
-	private readonly _requestShowFeedbackEvent = createRpcEvent<DidRequestShowFeedbackParams>(
-		'requestShowFeedback',
-		'signal',
-	);
 	/** Visualization requested by a command during a cold show, replayed once the app is ready. */
 	private _pendingVisualization: VisualizationMode | undefined;
 	private readonly _sidebarWorktreeEvent = createRpcEvent<{
@@ -1326,12 +1314,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 				markHealthViewVisited: repoPath => this.container.gitHealth.markHealthViewVisited(repoPath),
 				onHealthChanged: this._gitHealthChangedEvent.subscribe(buffer, tracker),
 			},
-			feedback: {
-				send: input => this.onSendFeedback(input),
-				onRequestShow: this._requestShowFeedbackEvent.subscribe(buffer, tracker),
-			},
 			launchpad: new LaunchpadService(this.container, buffer, tracker),
-			notifications: new NotificationsRpcService(this.container, this.host, buffer, tracker),
 			navigation: {
 				onRequestAction: this._requestActionEvent.subscribe(buffer, tracker),
 				onRequestOpenCompareMode: this._requestOpenCompareModeEvent.subscribe(buffer, tracker),
@@ -1419,7 +1402,6 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 				chooseAuthor: (title, placeholder, picked) => this.chooseAuthor(title, placeholder, picked),
 				chooseFile: (title, type, options) => this.chooseFile(title, type, options),
 				chooseRepository: () => this.chooseRepository(),
-				chooseAccountOrg: () => this.chooseAccountOrg(),
 			},
 			pullRequest: {
 				merge: (number, options) => this.mergePullRequest(number, options),
@@ -1482,6 +1464,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 			if (!config.isHidden) {
 				columnContext[`context.column.${name}.visible`] = true;
 			}
+
 			if (config.mode != null) {
 				columnContext[`context.column.${name}.mode`] = config.mode;
 			}
@@ -1613,12 +1596,6 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 
 					void this.revealRow(id);
 				}
-			}
-		} else if (hasFeedback(arg)) {
-			// The panel's title-toolbar command, so the graph is already open and warm; there is no cold
-			// path to buffer for — an app that isn't ready yet simply has nothing to open the dialog in.
-			if (this.host.ready) {
-				this.showFeedback();
 			}
 		} else if (hasVisualization(arg)) {
 			// Checked ahead of `hasCompare`/`hasRepository` — both duck-type on `arg.repository` alone,
@@ -1798,9 +1775,11 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 						};
 						deferredForRepoSwitch = true;
 					}
+
 					this.repository = repo;
 				}
 			}
+
 			let rowId: string | undefined;
 			// `show-rebase-summary` opens a selection-decoupled sheet (it fetches by worktree path, not
 			// the selected row), so don't move the user's selection when opening it.
@@ -1823,6 +1802,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 					this.setSelectedRows(rowId);
 				}
 			}
+
 			if (loading) {
 				this._pendingAction = {
 					action: arg.action,
@@ -1866,6 +1846,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 						scopeOrigin: arg.scopeOrigin,
 					};
 				}
+
 				this._requestActionEvent.fire({
 					action: arg.action,
 					target: arg.target,
@@ -2053,7 +2034,6 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 		if (this.host.is('view')) {
 			commands.push(
 				registerCommand(`${this.host.id}.refresh`, () => this.host.refresh(true)),
-				registerCommand(`${this.host.id}.sendFeedback`, () => this.showFeedback()),
 				registerCommand(`${this.host.id}.openInNewWindow`, async () => {
 					this.host.sendTelemetryEvent('graph/command', {
 						command: `${this.host.id}.openInNewWindow`,
@@ -2104,6 +2084,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 					} catch (ex) {
 						Logger.error(ex, 'GraphWebviewProvider.sidebarContextMenuActionTelemetry');
 					}
+
 					return handler(...args);
 				}),
 			);
@@ -2287,6 +2268,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 				this._pendingStateRefresh = false;
 				void this._data.notifyDidChangeState();
 			}
+
 			if (this._pendingBranchStateRefresh) {
 				this._pendingBranchStateRefresh = false;
 				void this._producers.notifyDidChangeBranchStateOnly();
@@ -2421,6 +2403,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 				this._wipStatsCancellations.delete(cancellation);
 				cancellation.dispose();
 			}
+
 			if (onAbort != null) {
 				signal?.removeEventListener('abort', onAbort);
 			}
@@ -2457,6 +2440,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 					deletions: file.stats.deletions,
 				};
 			}
+
 			return response;
 		} catch (ex) {
 			if (isCancellationError(ex)) throw ex;
@@ -2589,6 +2573,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 									break;
 							}
 						}
+
 						pending.push(configuration.updateEffective('graph.minimap.additionalTypes', additionalTypes));
 						break;
 					}
@@ -2617,6 +2602,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 						} else {
 							pending.push(configuration.updateEffective('graph.details.location', value));
 						}
+
 						break;
 					}
 					case 'sidebarPinned':
@@ -3072,65 +3058,6 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 		return this.host.is('view') && !this.container.onboarding.isDismissed('graph:layoutPrompt');
 	}
 
-	/** Fires the toolbar's "open the Send Feedback dialog" push — see {@link GraphFeedbackService}. */
-	showFeedback(): void {
-		this._requestShowFeedbackEvent.fire({ source: 'toolbar' });
-	}
-
-	/** RPC handler for the Send Feedback dialog's submit — sends the record, opens a prefilled GitHub
-	 *  issue for bug reports (whether or not the send itself succeeded), offers one from the toast for
-	 *  feature requests, and reports the outcome via telemetry and an info toast. */
-	private async onSendFeedback(input: GraphFeedbackInput): Promise<GraphFeedbackResult> {
-		const isBug = input.type === 'bug_report';
-
-		let sent = false;
-		try {
-			await this.container.feedback.send({ ...input, surface: 'graph', githubIssueOpened: isBug });
-			sent = true;
-		} catch {
-			// Already logged by the service; the outcome rides the result (and telemetry) below.
-		}
-
-		let issueOpened = false;
-		if (isBug) {
-			void openUrl(getFeedbackIssueUrl(this.container, 'bug_report', input.message));
-			issueOpened = true;
-		}
-
-		this.host.sendTelemetryEvent('graph/feedback/submitted', {
-			type: input.type,
-			outcome: sent ? 'success' : 'failed',
-			issueOpened: issueOpened,
-		});
-
-		if (isBug) {
-			void window.showInformationMessage(
-				l10n.t("Thanks. We've opened a GitHub issue so you can add more details."),
-			);
-		} else if (sent && input.type === 'feature_request') {
-			// Opt-in, unlike bugs: a one-line "would be nice" shouldn't force a public issue, but a real
-			// ask belongs where enhancements are actually tracked and discussed.
-			void this.offerFeatureRequestIssue(input.message);
-		} else if (sent) {
-			void window.showInformationMessage(
-				l10n.t('Thanks for the feedback. The team will use it to improve GitLens.'),
-			);
-		}
-
-		return { sent: sent, issueOpened: issueOpened };
-	}
-
-	private async offerFeatureRequestIssue(message: string): Promise<void> {
-		const file = { title: l10n.t('File on GitHub') };
-		const result = await window.showInformationMessage(
-			l10n.t('Thanks for the feedback. The team will use it to improve GitLens.'),
-			file,
-		);
-		if (result !== file) return;
-
-		void openUrl(getFeedbackIssueUrl(this.container, 'feature_request', message));
-	}
-
 	/** RPC handler for the whole welcome-continue interaction — see docs/webview-architecture.md
 	 *  ("cross-transport ordering") for why this rides one supertalk message instead of the two
 	 *  legacy IPC commands it replaces. */
@@ -3180,6 +3107,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 					destinationId: 'workbench.view.extension.gitlensPanel',
 				});
 			} catch {}
+
 			try {
 				await executeCoreCommand('workbench.view.extension.gitlensPanel.resetViewContainerLocation');
 			} catch {}
@@ -3212,6 +3140,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 				eventData[`column.${name}.${prop as keyof GraphColumnConfig}`] = value;
 			}
 		}
+
 		this.host.sendTelemetryEvent('graph/columns/changed', eventData);
 	}
 
@@ -3270,6 +3199,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 					await RepoActions.pull(itemRef.repoPath, itemRef);
 					return;
 				}
+
 				if (ahead > 0) {
 					await RepoActions.push(itemRef.repoPath, false, itemRef);
 					return;
@@ -3355,6 +3285,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 		if (outcome === 'declined') {
 			this.container.cache.deletePullRequests();
 		}
+
 		this._panels.resetPullRequests();
 		this.container.launchpad.refresh();
 		this.refreshAfterPullRequestMerge();
@@ -3576,6 +3507,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 			if (!enrichedAutolinksMaybeResult?.paused) {
 				enrichedAutolinks = enrichedAutolinksMaybeResult?.value;
 			}
+
 			pr = getSettledValue(prResult);
 		}
 
@@ -3735,6 +3667,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 				} else {
 					await StashActions.drop(rowRepoPath, [ref]);
 				}
+
 				break;
 			}
 			case 'open-changes':
@@ -3749,6 +3682,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 				} else {
 					await openCommitChanges(this.container, commit, false, this.getOpenEditorShowOptions());
 				}
+
 				break;
 			}
 			case 'push-to-commit':
@@ -3815,10 +3749,6 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 			'repository.folder.scheme': this.repository?.folder?.uri.scheme,
 			'repository.provider.id': this.repository?.provider.id,
 		});
-	}
-
-	private async chooseAccountOrg(): Promise<void> {
-		await executeCommand<Source>('gitlens.gk.switchOrganization', { source: 'graph' });
 	}
 
 	private async chooseRef(
@@ -4230,6 +4160,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 			if (this._cancellations.get('rebind') === cancellation) {
 				this._cancellations.delete('rebind');
 			}
+
 			cancellation.dispose();
 		}
 	}
@@ -4666,7 +4597,9 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 		// and "all" mean VS Code Git is auto-fetching, so we yield to it.
 		const vscodeAutofetch = workspace.getConfiguration('git').get<boolean | 'all'>('autofetch');
 		if (vscodeAutofetch === true || vscodeAutofetch === 'all') return 'vscode';
+
 		if (configuration.get('graph.autoFetch.enabled')) return 'gitlens';
+
 		return 'off';
 	}
 
@@ -4699,6 +4632,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 			this.clearAutoFetchTimer();
 			return;
 		}
+
 		if (this._autoFetchInFlight) return;
 
 		this.clearAutoFetchTimer();
@@ -4712,8 +4646,11 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 
 		// Re-check after the async gap; state may have changed (hidden, repo swap, mode flip).
 		if (this.getAutoFetchMode() !== 'gitlens') return;
+
 		if (this._repository !== repo) return;
+
 		if (!this.host.visible || !this.isWindowFocused) return;
+
 		if (this._autoFetchInFlight) return;
 
 		const baseline = Math.max(lastFetched, this._lastAutoFetchAttemptAt ?? 0);
@@ -4735,10 +4672,12 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 	@debug()
 	private async triggerAutoFetch(): Promise<void> {
 		if (this._autoFetchInFlight) return;
+
 		if (this.getAutoFetchMode() !== 'gitlens') return;
 
 		const repo = this._repository;
 		if (repo == null) return;
+
 		if (!this.host.visible || !this.isWindowFocused) return;
 
 		// Set the flag BEFORE any awaits so a concurrent caller (e.g. a manual fetch event firing
@@ -4929,6 +4868,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 				}
 			}
 		}
+
 		return pinned;
 	}
 
@@ -4985,6 +4925,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 						if (!cancellation.token.isCancellationRequested) {
 							this._includedRefTipShas = this.computeIncludedRefTipShas(refs, graph);
 						}
+
 						return Object.fromEntries(refs);
 					});
 				}
@@ -5024,6 +4965,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 						continuation: continuation,
 					};
 				}
+
 				break;
 			}
 			case 'agents': {
@@ -5038,6 +4980,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 						continuation: continuation,
 					};
 				}
+
 				break;
 			}
 			default:
@@ -5057,6 +5000,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 		graph: GitGraph,
 	): string[] | undefined {
 		if (refs == null) return undefined;
+
 		if (!refs.size) return [];
 
 		const dated: { sha: string; time: number }[] = [];
@@ -5131,6 +5075,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 		if (previousHome != null && previousHome !== home) {
 			await this.updatePersistedPerspective(previousHome.path, undefined);
 		}
+
 		if (home != null && bound != null && bound !== home) {
 			await this.updatePersistedPerspective(home.path, bound.path);
 		}
@@ -5157,7 +5102,9 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 		mode: ColumnMode | undefined,
 	): GraphColumnModeFor<T> {
 		if (mode == null) return undefined;
+
 		if (name === 'graph') return mode === 'compact' ? mode : undefined;
+
 		if (name === 'changes') return isChangesColumnMode(mode) ? mode : undefined;
 
 		return undefined;
@@ -5230,6 +5177,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 			if (!settings.isHidden) {
 				visibleColumns++;
 			}
+
 			contextItems.push(
 				`column:${name}:${settings.isHidden ? 'hidden' : 'visible'}${settings.mode ? `+${settings.mode}` : ''}`,
 			);
@@ -5280,6 +5228,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 	private getBranchesVisibility(filters: StoredGraphFilters | undefined): GraphBranchesVisibility {
 		// We can't currently support all, smart, or favorited branches on virtual repos
 		if (this.repository?.virtual) return 'current';
+
 		if (filters == null) return configuration.get('graph.branchesVisibility');
 
 		let branchesVisibility: GraphBranchesVisibility;
@@ -5518,6 +5467,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 		if (item != null && !('webview' in item)) {
 			item.webview = this.host.id;
 		}
+
 		return item;
 	}
 
@@ -5610,7 +5560,6 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 		this._searchRequest = undefined;
 
 		// Runs on every state build, not just opens — its own guards make repeats cheap no-ops
-		void this.container.subscription.autoResetTrialIfEligible({ source: 'graph' });
 
 		if (this.container.git.repositoryCount === 0) {
 			this._wip.updateWorkingTreeBadge(undefined);
@@ -5774,6 +5723,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 					if (rebuildContexts) {
 						this._pendingContextsRebuild = true;
 					}
+
 					throw ex;
 				}
 				// A repo swap/clear disposed+replaced the session mid-refresh — abort rather than committing a
@@ -5789,6 +5739,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 				} else if (result.reason != null) {
 					scope?.info(`[graph] incremental walk: fallback (${result.reason})`);
 				}
+
 				return session.current;
 			})();
 		} else {
@@ -5822,10 +5773,12 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 				} else {
 					session.dispose();
 				}
+
 				return session.current;
 			})();
 			dataPromise = ref.promise;
 		}
+
 		this._data.loading = dataPromise;
 		// A load is underway, so any previous failure no longer stands — clear it before the walk so the
 		// webview's Retry overlay can't outlive the load it belongs to.
@@ -5879,6 +5832,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 					if (await this._data.ensureSelectedTargetLoaded()) {
 						selectionChanged = true;
 					}
+
 					if (cancellation.token.isCancellationRequested || this._data.loading !== dataPromise) return;
 
 					void this.fireFiltersChanged();
@@ -5955,6 +5909,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 			branch = reread;
 			branchStateRevision = this._producers.nextBranchStateRevision();
 		}
+
 		if (cancellation.token.isCancellationRequested) throw new CancellationError();
 
 		if (branch != null) {
@@ -6386,6 +6341,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 			const stored = storedExcludeRefs[id];
 			if (stored.type === 'remote' && stored.name === '*' && stored.owner === owner) return id;
 		}
+
 		return undefined;
 	}
 
@@ -6571,6 +6527,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 		const now = Date.now();
 		for (const s of sessions) {
 			if (s.worktreePath == null || s.worktree?.branch?.name == null) continue;
+
 			if (!repoWorktreePaths.has(s.worktreePath)) continue;
 
 			// `Math.max(0, …)` clamps clock-skew (future-dated timestamps) so a stale clock
@@ -6592,6 +6549,7 @@ export class GraphWebviewProvider implements WebviewProvider<State, State, Graph
 				refs.set(upstreamRef.id, upstreamRef);
 			}
 		}
+
 		return refs;
 	}
 
@@ -7074,6 +7032,7 @@ function convertBranchToIncludeOnlyRef(branch: GitBranch, remote?: boolean): Gra
 
 function convertBranchUpstreamToIncludeOnlyRef(branch: GitBranch): GraphIncludeOnlyRef | undefined {
 	if (branch.upstream == null || branch.upstream.missing) return undefined;
+
 	if (branch.upstream.local) {
 		const { name } = branch.upstream;
 		return { id: getBranchId(branch.repoPath, false, name), type: 'head', name: name };
@@ -7092,7 +7051,9 @@ function convertRefToGraphRefType(ref: GitReference): GraphRefType | undefined {
 	switch (ref.refType) {
 		case 'branch':
 			if (ref.remote) return 'remote';
+
 			if (ref.worktree) return 'worktree';
+
 			return 'head';
 		case 'tag':
 			return 'tag';
@@ -7113,6 +7074,7 @@ function normalizeShortcutOverrides(
 ): Record<string, readonly string[] | false> {
 	return filterMapObject(overrides, (_, value) => {
 		if (value === false) return false;
+
 		if (Array.isArray(value) || typeof value === 'string') return ensureArray(value);
 
 		return undefined;

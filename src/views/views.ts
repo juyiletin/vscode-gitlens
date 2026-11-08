@@ -22,14 +22,12 @@ import { getContext, setContext } from '../system/-webview/context.js';
 import { getViewFocusCommand } from '../system/-webview/vscode/views.js';
 import { registerCommitDetailsWebviewView } from '../webviews/commitDetails/registration.js';
 import { registerGraphWebviewView } from '../webviews/plus/graph/registration.js';
-import { registerPatchDetailsWebviewView } from '../webviews/plus/patchDetails/registration.js';
 import { registerTimelineWebviewView } from '../webviews/plus/timeline/registration.js';
 import type { WebviewsController } from '../webviews/webviewsController.js';
 import { registerWelcomeWebviewView } from '../webviews/welcome/registration.js';
 import { BranchesView } from './branchesView.js';
 import { CommitsView } from './commitsView.js';
 import { ContributorsView } from './contributorsView.js';
-import { DraftsView } from './draftsView.js';
 import { FileHistoryView } from './fileHistoryView.js';
 import { LaunchpadView } from './launchpadView.js';
 import { LineHistoryView } from './lineHistoryView.js';
@@ -470,7 +468,6 @@ export class Views implements Disposable {
 
 	private registerViews(): Disposable[] {
 		return [
-			(this._draftsView = new DraftsView(this.container)),
 			(this._lineHistoryView = new LineHistoryView(this.container)),
 			(this._pullRequestView = new PullRequestView(this.container)),
 			(this._workspacesView = new WorkspacesView(this.container)),
@@ -481,7 +478,6 @@ export class Views implements Disposable {
 		return [
 			(this._commitDetailsView = registerCommitDetailsWebviewView(webviews)),
 			(this._graphView = registerGraphWebviewView(webviews)),
-			(this._patchDetailsView = registerPatchDetailsWebviewView(webviews)),
 			(this._timelineView = registerTimelineWebviewView(webviews)),
 			(this._welcomeView = registerWelcomeWebviewView(webviews)),
 		];
@@ -509,12 +505,14 @@ export class Views implements Disposable {
 				if (this._scmGroupedView == null) {
 					this.updateScmGroupedViewsRegistration(true);
 				}
+
 				view = this._scmGroupedView!.setView(type);
 				if (view == null) {
 					debugger;
 					throw new Error(`Unable to initialize view: ${type}`);
 				}
 			}
+
 			return view;
 		};
 
@@ -537,6 +535,7 @@ export class Views implements Disposable {
 					method = value.bind(target);
 					methodCache.set(prop, method);
 				}
+
 				return method;
 			},
 			set: function (_target, prop, value, receiver) {
@@ -577,6 +576,7 @@ export class Views implements Disposable {
 		if (!this.scmGroupedViews?.has(type)) {
 			type = this.scmGroupedViews?.size ? (first(this.scmGroupedViews) as T) : undefined!;
 		}
+
 		this.lastSelectedScmGroupedView = type;
 
 		if (focus) {
@@ -769,11 +769,6 @@ export class Views implements Disposable {
 		return this._contributorsView ?? this.getScmGroupedView('contributors');
 	}
 
-	private _draftsView!: DraftsView;
-	get drafts(): DraftsView {
-		return this._draftsView;
-	}
-
 	private _fileHistoryView!: FileHistoryView | undefined;
 	get fileHistory(): FileHistoryView {
 		return this._fileHistoryView ?? this.getScmGroupedView('fileHistory');
@@ -793,11 +788,6 @@ export class Views implements Disposable {
 	// get lineHistory(): LineHistoryView {
 	// 	return this._lineHistoryView;
 	// }
-
-	private _patchDetailsView!: ReturnType<typeof registerPatchDetailsWebviewView>;
-	get patchDetails(): ReturnType<typeof registerPatchDetailsWebviewView> {
-		return this._patchDetailsView;
-	}
 
 	private _pullRequestView!: PullRequestView;
 	get pullRequest(): PullRequestView {
@@ -941,8 +931,6 @@ export class Views implements Disposable {
 				return show('commits', this._commitsView);
 			case 'contributors':
 				return show('contributors', this._contributorsView);
-			case 'drafts':
-				return this.drafts.show();
 			case 'fileHistory':
 				return show('fileHistory', this._fileHistoryView);
 			case 'launchpad':
@@ -978,6 +966,7 @@ function getGroupedViews(cfg: Readonly<Record<GroupableTreeViewTypes, boolean>>)
 		if (value) {
 			groupedViews.add(key);
 		}
+
 		void setContext(`gitlens:views:scm:grouped:views:${key}`, value);
 	}
 

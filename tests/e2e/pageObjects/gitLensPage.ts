@@ -1,5 +1,4 @@
 import type { FrameLocator, Locator } from '@playwright/test';
-import type { SimulationState } from '../../../src/plus/gk/__debug__accountDebug.js';
 import { MaxTimeout, ShortTimeout } from '../baseTest.js';
 import { VSCodePage } from './vscodePage.js';
 
@@ -13,43 +12,19 @@ export class GitLensPage extends VSCodePage {
 	}
 
 	/**
-	 * Simulate a subscription state for testing Pro features.
-	 * This allows tests to access Pro-gated features like worktrees.
-	 *
-	 * The debug module is loaded asynchronously after extension activation,
-	 * so we retry the command until it succeeds.
-	 *
-	 * @param state - Subscription state
+	 * Local Pro access is always enabled in this fork. Keep the fixture method so existing specs can
+	 * express that precondition without asking the extension to simulate an account or subscription.
 	 */
-	async startSubscriptionSimulation(
-		state: SimulationState = { state: 6 /*SubscriptionState.Paid*/, planId: 'pro' },
-	): Promise<{ success: boolean } & Disposable & AsyncDisposable> {
-		if (!(await this.waitForCommand('gitlens.plus.simulate.subscription'))) {
-			throw new Error('gitlens.plus.simulate.subscription command not found');
-		}
-
-		const success = await this.executeCommand<boolean>('gitlens.plus.simulate.subscription', state);
-		// Wait for the subscription change event to propagate through the system
-		await this.page.waitForTimeout(ShortTimeout);
-		return {
-			success: success,
-			// `using` calls the SYNC disposer and drops whatever it returns, so teardown can't be awaited
-			// through it — `asyncDispose` below is the awaited path. What the sync one has to guarantee is
-			// that its floating promise never surfaces as an UNHANDLED rejection: the worker fixture
-			// force-kills the editor before closing it, so a late `evaluate()` lands on a dead HTTP server
-			// and rejects with `SocketError: other side closed`. Unhandled, that takes the whole worker
-			// down — Playwright reports it as "errors were not a part of any test", turning a run whose
-			// every test passed into a red one. Swallowing is right here precisely because this path can't
-			// report anyway; callers that need to know use the async disposer.
-			[Symbol.dispose]: () => {
-				void this.stopSubscriptionSimulation().catch(() => {});
-			},
-			[Symbol.asyncDispose]: () => this.stopSubscriptionSimulation(),
-		};
+	startSubscriptionSimulation(_state?: object): Promise<{ success: boolean } & Disposable & AsyncDisposable> {
+		return Promise.resolve({
+			success: true,
+			[Symbol.dispose]: () => {},
+			[Symbol.asyncDispose]: () => Promise.resolve(),
+		});
 	}
 
-	async stopSubscriptionSimulation(): Promise<void> {
-		await this.executeCommand('gitlens.plus.simulate.subscription', { state: null });
+	stopSubscriptionSimulation(): Promise<void> {
+		return Promise.resolve();
 	}
 
 	/**
@@ -271,7 +246,6 @@ export class GitLensPage extends VSCodePage {
 	// GitLens Webviews
 	// ============================================================================
 
-	// ============================================================================
 	// Blame Annotations
 	// ============================================================================
 
@@ -302,6 +276,7 @@ export class GitLensPage extends VSCodePage {
 					if (text.includes(pattern)) return true;
 				}
 			}
+
 			return false;
 		}, expectedText);
 	}
@@ -339,8 +314,10 @@ export class GitLensPage extends VSCodePage {
 					continue;
 				}
 			}
+
 			await this.page.waitForTimeout(ShortTimeout);
 		}
+
 		return null;
 	}
 
@@ -407,8 +384,10 @@ export class GitLensPage extends VSCodePage {
 				usePurpose = iterations % 2 === 1;
 				continue;
 			}
+
 			await this.page.waitForTimeout(ShortTimeout);
 		}
+
 		return null;
 	}
 }

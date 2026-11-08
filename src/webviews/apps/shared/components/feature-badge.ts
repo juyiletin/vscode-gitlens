@@ -295,15 +295,18 @@ export class GlFeatureBadge extends LitElement {
 						${localizedContent(l10n.t('{reactivate} or {upgrade}'), {
 							reactivate: html`<gl-button
 								density="tight"
-								href="${createCommandLink<Source>('gitlens.plus.reactivateProTrial', this.source)}"
+								href="${createCommandLink<Source>('gitlens.showSettingsPage!account', this.source)}"
 								tooltip=${l10n.t('Reactivate your Pro trial for another {0} days', getNumericFormat()(proTrialLengthInDays))}
 								>${l10n.t('Reactivate Pro Trial')}</gl-button
 							>`,
 							upgrade: html`<a
-								href="${createCommandLink<SubscriptionUpgradeCommandArgs>('gitlens.plus.upgrade', {
-									plan: 'pro',
-									...(this.source ?? { source: 'feature-badge' }),
-								})}"
+								href="${createCommandLink<SubscriptionUpgradeCommandArgs>(
+									'gitlens.showSettingsPage!account',
+									{
+										plan: 'pro',
+										...(this.source ?? { source: 'feature-badge' }),
+									},
+								)}"
 								title=${l10n.t('Upgrade to Pro')}
 								>${l10n.t('upgrade to Pro')}</a
 							>`,
@@ -328,11 +331,11 @@ export class GlFeatureBadge extends LitElement {
 			${localizedContent(l10n.t('{startTrial} or {signIn}'), {
 				startTrial: html`<gl-button
 					density="tight"
-					href="${createCommandLink<Source>('gitlens.plus.signUp', this.source)}"
+					href="${createCommandLink<Source>('gitlens.showSettingsPage!account', this.source)}"
 					>${l10n.t('Start {0}-day Pro Trial', proTrialLengthInDays)}</gl-button
 				>`,
 				signIn: html`<a
-					href="${createCommandLink<Source>('gitlens.plus.login', this.source)}"
+					href="${createCommandLink<Source>('gitlens.showSettingsPage!account', this.source)}"
 					title=${l10n.t('Sign In')}
 					>${l10n.t('sign in')}</a
 				>`,
@@ -345,7 +348,7 @@ export class GlFeatureBadge extends LitElement {
 			${leadin ?? nothing}
 			<gl-button
 				density="tight"
-				href="${createCommandLink<SubscriptionUpgradeCommandArgs>('gitlens.plus.upgrade', {
+				href="${createCommandLink<SubscriptionUpgradeCommandArgs>('gitlens.showSettingsPage!account', {
 					plan: 'pro',
 					...(this.source ?? { source: 'feature-badge' }),
 				})}"

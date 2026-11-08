@@ -413,12 +413,15 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 		if (bucket.review != null) {
 			out.review = { execState: bucket.review.execState, hasResult: bucket.review.result != null };
 		}
+
 		if (bucket.compose != null) {
 			out.compose = { execState: bucket.compose.execState, hasResult: bucket.compose.result != null };
 		}
+
 		if (bucket.resolve != null) {
 			out.resolve = { execState: bucket.resolve.execState, hasResult: bucket.resolve.result != null };
 		}
+
 		return out.review != null || out.compose != null || out.resolve != null ? out : undefined;
 	}
 
@@ -624,6 +627,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 	 *  (a manual expand already shows everything); auto-partial only surfaces while collapsed. */
 	private get agentStatusExpand(): ExpandState {
 		if (this._agentUserMode === 'expanded') return 'expanded';
+
 		return this._agentStatusAutoPartial ? 'partial' : 'collapsed';
 	}
 
@@ -818,6 +822,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 				this._wipFileStatsFetchedFor = undefined;
 				this._wipFileStats = undefined;
 			}
+
 			return;
 		}
 
@@ -833,6 +838,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 		if (this._wipFileStatsFetchedFor?.repo?.path !== repoPath) {
 			this._wipFileStats = undefined;
 		}
+
 		this._wipFileStatsFetchedFor = wip;
 
 		void (async () => {
@@ -920,7 +926,9 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 
 		const active = this._state.activeMode.get();
 		if (active != null) return active;
+
 		if (this.sha == null && (this.shas == null || this.shas.length === 0)) return 'none';
+
 		return this.isMultiCommit ? 'multicommit' : this.isWip ? 'wip' : 'commit';
 	}
 
@@ -980,7 +988,9 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 
 		const ctx = this.effectiveContext;
 		if (ctx === 'wip') return this._state.wip.get()?.changes?.files?.length ?? 0;
+
 		if (ctx === 'multicommit') return this._state.compareFiles.get()?.length ?? 0;
+
 		return this._state.commit.get()?.files?.length ?? 0;
 	}
 
@@ -1079,6 +1089,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 		} else {
 			next.delete(commitId);
 		}
+
 		this._state.composeRefineExcludedCommitIds.set(next);
 	}
 
@@ -1095,6 +1106,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 		if (onReady != null) {
 			onReady();
 		}
+
 		const selection: DetailsSelection = {
 			...this.currentSelection(),
 			repoPath: params.repoPath,
@@ -1419,6 +1431,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 		// exemption and auto-close on selecting the new tip.
 		const tipSha = findRefTipSha(ref, this._graphState?.rows) ?? ref.sha;
 		if (tipSha != null && this.sha === tipSha) return true;
+
 		if (!isWipSelectionSha(this.sha)) return false;
 
 		return this.isBranchSheetScoped(ref);
@@ -1594,6 +1607,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 		// visible effect would leave a stale auto-expand + highlighted card waiting to pop up the
 		// next time the user exits review/compose — clearly not what they asked for.
 		if (this._state.activeMode.get() != null) return;
+
 		if (this._state.wip.get() == null) return;
 
 		// Preserve any user-dragged splitter size — sidebar/kanban-driven expand mirrors the
@@ -1676,6 +1690,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 		} else if (cardRect.bottom > scrollerRect.bottom - padding) {
 			scroller.scrollTop += cardRect.bottom - (scrollerRect.bottom - padding);
 		}
+
 		return true;
 	}
 
@@ -1683,7 +1698,9 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 	 *  "this panel's repo"; a synthetic WIP row id carries its worktree path (see `createWipRowId`). */
 	private computeWorktreePathFromSha(sha: string | undefined): string | undefined {
 		if (sha == null) return undefined;
+
 		if (sha === uncommitted) return this.effectiveRepoPath;
+
 		return getWipRowWorktreePath(sha);
 	}
 
@@ -1746,6 +1763,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 			clearTimeout(this._flushWipDraftTimer);
 			this._flushWipDraftTimer = undefined;
 		}
+
 		if (pending == null) return;
 
 		this._lastFlushedWipDraftKey = pending.key;
@@ -1818,6 +1836,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 		if (this._flushWipDraftTimer != null) {
 			clearTimeout(this._flushWipDraftTimer);
 		}
+
 		this._flushWipDraftTimer = setTimeout(() => this.flushPendingWipDraftNow(), 250);
 	}
 
@@ -1832,6 +1851,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 	 *  the panel having moved on to a different repo's WIP between the IPC dispatch and consumption. */
 	setCommitMessage(repoPath: string, message: string): void {
 		if (this._state.activeMode.get() != null) return;
+
 		if (this.effectiveRepoPath !== repoPath) return;
 
 		this._state.commitMessage.set(message);
@@ -1910,6 +1930,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 			if (mode === 'resolve') {
 				this._workflow.resolve.seedFromEscalation(selection.repoPath);
 			}
+
 			return;
 		}
 
@@ -1937,6 +1958,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 		await this._actionsReady;
 		const result = await this._actions.fetchAutoRebaseSummary(repoPath);
 		if (result == null) throw new Error('No Auto-Rebase summary is available.');
+
 		if ('error' in result) throw new Error(result.error.message);
 
 		return result.summary;
@@ -2123,6 +2145,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 				if (found != null) return found;
 			}
 		}
+
 		return null;
 	}
 
@@ -2148,6 +2171,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 				if (found != null) return found;
 			}
 		}
+
 		return null;
 	}
 
@@ -2228,6 +2252,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 				if (this._sheetStack.some(d => d.kind === 'rebaseSummary')) {
 					this._rebaseSummaryWipAtOpen = undefined;
 				}
+
 				this._sheetStack = next;
 				this._sheetFocusMemos = [];
 			}
@@ -2504,6 +2529,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 				this._reviewThreadsSynced = undefined;
 				this._actions.setReviewThreads(undefined);
 			}
+
 			return;
 		}
 
@@ -2573,6 +2599,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 				this._reviewFilesSynced = undefined;
 				this._actions.setReviewFiles(undefined);
 			}
+
 			return;
 		}
 
@@ -2629,9 +2656,11 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 				if (this._prevSheetTopKey != null) {
 					this._sheetCoordinator.closed(this._prevSheetTopKey);
 				}
+
 				if (topKey != null) {
 					this._sheetCoordinator.opened(topKey);
 				}
+
 				this._prevSheetTopKey = topKey;
 			}
 
@@ -2896,6 +2925,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 			const status =
 				this.engagedRunningOperation?.kind === 'resolve' ? this.engagedRunningOperation.execState : undefined;
 			if (status === 'generating') return formatGeneratingStatus('resolve', this._state.aiModel.get());
+
 			if (status === 'error') return l10n.t('Error');
 
 			// Complete: show a resolved-files count in the identity row, mirroring compose/review's
@@ -2913,14 +2943,17 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 					>`;
 				}
 			}
+
 			return undefined;
 		}
+
 		if (mode !== 'compose' && mode !== 'review') return undefined;
 
 		const status = this.engagedModeStatus?.[mode]?.execState;
 		if (status === 'generating') {
 			return formatGeneratingStatus(mode, this._state.aiModel.get());
 		}
+
 		if (status === 'error') return l10n.t('Error');
 
 		// Complete / backed — pull counts from the back-preview snapshot or the resolved value.
@@ -2970,6 +3003,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 						fileSet.add(f);
 					}
 				}
+
 				return formatModeCounts(findingCount, fileSet.size, 'findings');
 			}
 		}
@@ -3141,8 +3175,11 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 		if (this.isMultiCommit && this._state.commitFrom.get() != null && this._state.commitTo.get() != null) {
 			return this.resolveByContext('multicommit');
 		}
+
 		if (this.isWip && this._state.wip.get() != null) return this.resolveByContext('wip');
+
 		if (this._state.commit.get() != null) return this.resolveByContext('commit');
+
 		return undefined;
 	}
 
@@ -3937,6 +3974,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 		} else {
 			fallback = rightRef;
 		}
+
 		const ref = this._state.branchCompareSelectedCommitSha.get() ?? fallback;
 		return ref != null ? { ref: ref } : undefined;
 	}
@@ -4349,7 +4387,6 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 		return html`<gl-details-resolve-mode-panel
 			.status=${mappedStatus}
 			.errorMessage=${resolveError}
-			.errorAction=${resolveValue && 'error' in resolveValue ? resolveValue.error.action : undefined}
 			.aiUnavailable=${resolveData?.aiUnavailable}
 			.resolutions=${resolveData?.resolutions}
 			.errors=${resolveData?.errors}
@@ -4922,10 +4959,12 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 			const panel = this.querySelector<GlDetailsComposeModePanel>('gl-details-compose-mode-panel');
 			return panel != null ? { files: panel.excludedFiles, commits: panel.commitExcludedIds } : undefined;
 		}
+
 		if (mode === 'review') {
 			const panel = this.findReviewModePanel();
 			return panel != null ? { files: panel.excludedFiles } : undefined;
 		}
+
 		return undefined;
 	}
 
@@ -4934,9 +4973,11 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 		if (mode === 'compose') {
 			return this.querySelector<GlDetailsComposeModePanel>('gl-details-compose-mode-panel')?.idleDraftLive;
 		}
+
 		if (mode === 'review') {
 			return this.findReviewModePanel()?.idleDraftLive;
 		}
+
 		return undefined;
 	}
 
@@ -4946,10 +4987,12 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 			const panel = this.querySelector<GlDetailsComposeModePanel>('gl-details-compose-mode-panel');
 			return panel != null ? { refineMode: panel.refineModeLive, refineDraft: panel.refineDraftLive } : undefined;
 		}
+
 		if (mode === 'resolve') {
 			const panel = this.querySelector<GlDetailsResolveModePanel>('gl-details-resolve-mode-panel');
 			return panel != null ? { refineMode: panel.refineModeLive, refineDraft: panel.refineDraftLive } : undefined;
 		}
+
 		return undefined;
 	}
 
@@ -5207,6 +5250,8 @@ interface BranchStateLike {
 
 function branchStateEqual(a: BranchStateLike | undefined, b: BranchStateLike | undefined): boolean {
 	if (a === b) return true;
+
 	if (a == null || b == null) return false;
+
 	return a.ahead === b.ahead && a.behind === b.behind && a.upstream === b.upstream && a.worktree === b.worktree;
 }

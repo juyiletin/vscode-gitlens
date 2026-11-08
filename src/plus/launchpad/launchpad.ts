@@ -31,7 +31,6 @@ import {
 	OpenOnBitbucketQuickInputButton,
 	OpenOnGitHubQuickInputButton,
 	OpenOnGitLabQuickInputButton,
-	OpenOnWebQuickInputButton,
 	OpenWorktreeInNewWindowQuickInputButton,
 	PinQuickInputButton,
 	RefreshQuickInputButton,
@@ -304,11 +303,14 @@ export class LaunchpadCommand extends QuickCommand<State> {
 						} catch (ex) {
 							Logger.error(ex, 'Unable to refresh the connected integrations after signing in');
 						}
+
 						context.connectedIntegrations = await this.container.launchpad.getConnectedIntegrations();
 						step.skip();
 						continue;
 					}
+
 					if (step.goBack() == null) break;
+
 					continue;
 				}
 			}
@@ -334,6 +336,7 @@ export class LaunchpadCommand extends QuickCommand<State> {
 				const result = yield* this.confirmCloudIntegrationsConnectStep(state, context);
 				if (result === StepResultBreak) {
 					if (step.goBack() == null) break;
+
 					continue;
 				}
 
@@ -353,6 +356,7 @@ export class LaunchpadCommand extends QuickCommand<State> {
 				const result = yield* ensureAccessStep(this.container, 'launchpad', state, context, step);
 				if (result === StepResultBreak) {
 					if (step.goBack() == null) break;
+
 					continue;
 				}
 			}
@@ -391,6 +395,7 @@ export class LaunchpadCommand extends QuickCommand<State> {
 					toggleSearchMode(false);
 					state.item = undefined;
 					if (step.goBack() == null) break;
+
 					continue;
 				}
 
@@ -430,6 +435,7 @@ export class LaunchpadCommand extends QuickCommand<State> {
 				if (confirmResult === StepResultBreak) {
 					state.action = undefined;
 					if (step.goBack() == null) break;
+
 					continue;
 				}
 
@@ -828,7 +834,6 @@ export class LaunchpadCommand extends QuickCommand<State> {
 			buttons: [
 				...(inSearchMode ? [QuickInputButtons.Back] : []),
 				// FeedbackQuickInputButton,
-				OpenOnWebQuickInputButton,
 				...(hasDisconnectedIntegrations ? [ConnectIntegrationButton] : []),
 				LaunchpadSettingsQuickInputButton,
 				RefreshQuickInputButton,
@@ -908,16 +913,12 @@ export class LaunchpadCommand extends QuickCommand<State> {
 						void openUrl('https://github.com/gitkraken/vscode-gitlens/discussions/3286');
 						break;
 
-					case OpenOnWebQuickInputButton:
-						this.sendTitleActionTelemetry('open-on-gkdev', context);
-						void openUrl(await this.container.launchpad.generateWebUrl());
-						break;
-
 					case RefreshQuickInputButton:
 						this.sendTitleActionTelemetry('refresh', context);
 						await updateItems(quickpick, { force: true, immediate: true });
 						break;
 				}
+
 				return undefined;
 			},
 
@@ -1412,6 +1413,7 @@ export class LaunchpadCommand extends QuickCommand<State> {
 				previousPlaceholder = step.quickpick.placeholder;
 				step.quickpick.placeholder = l10n.t('Connecting integrations...');
 			}
+
 			const resume = step.freeze?.();
 			const connected = await this.container.integrations.connectCloudIntegrations(
 				{ integrationIds: supportedLaunchpadIntegrations },
@@ -1422,6 +1424,7 @@ export class LaunchpadCommand extends QuickCommand<State> {
 			if (step.quickpick) {
 				step.quickpick.placeholder = previousPlaceholder;
 			}
+
 			return { connected: connected, resume: () => resume?.dispose() };
 		}
 
@@ -1775,6 +1778,7 @@ async function updateContextItems(
 			updateTelemetryContext(context);
 		}
 	}
+
 	context.connectedIntegrations = await container.launchpad.getConnectedIntegrations();
 }
 

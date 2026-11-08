@@ -2,21 +2,15 @@ import type { CancellationToken, ConfigurationChangeEvent, Disposable } from 'vs
 import { l10n, ProgressLocation, TreeItem, TreeItemCollapsibleState, window } from 'vscode';
 import { trace } from '@gitlens/utils/decorators/log.js';
 import type { WorkspacesViewConfig } from '../config.js';
-import { previewBadge, urls } from '../constants.js';
 import type { Container } from '../container.js';
 import { unknownGitUri } from '../git/gitUri.js';
-import type { GlRepository } from '../git/models/repository.js';
-import { ensurePlusFeaturesEnabled } from '../plus/gk/utils/-webview/plus.utils.js';
-import { toAbortSignal } from '../system/-webview/cancellation.js';
 import { executeCommand } from '../system/-webview/command.js';
 import { configuration } from '../system/-webview/configuration.js';
-import { openUrl } from '../system/-webview/vscode/uris.js';
 import { openWorkspace } from '../system/-webview/vscode/workspaces.js';
 import { ViewNode } from './nodes/abstract/viewNode.js';
 import { MessageNode } from './nodes/common.js';
 import { RepositoriesNode } from './nodes/repositoriesNode.js';
-import { RepositoryNode } from './nodes/repositoryNode.js';
-import type { WorkspaceMissingRepositoryNode } from './nodes/workspaceMissingRepositoryNode.js';
+import type { RepositoryNode } from './nodes/repositoryNode.js';
 import { WorkspaceNode } from './nodes/workspaceNode.js';
 import type { RevealOptions } from './viewBase.js';
 import { disposeChildren, ViewBase } from './viewBase.js';
@@ -36,26 +30,13 @@ export class WorkspacesViewNode extends ViewNode<'workspaces', WorkspacesView> {
 		if (this._children == null) {
 			const children: (WorkspaceNode | MessageNode | RepositoriesNode)[] = [];
 
-			const { cloudWorkspaces, cloudWorkspaceInfo, localWorkspaces, localWorkspaceInfo } =
-				await this.view.container.workspaces.getWorkspaces();
+			const { localWorkspaces, localWorkspaceInfo } = await this.view.container.workspaces.getWorkspaces();
 
-			if (cloudWorkspaces.length || localWorkspaces.length) {
+			if (localWorkspaces.length === 0) {
 				children.push(new RepositoriesNode(this.view));
-
-				for (const workspace of cloudWorkspaces) {
-					children.push(new WorkspaceNode(this.uri, this.view, this, workspace));
-				}
-
-				if (cloudWorkspaceInfo != null) {
-					children.push(new MessageNode(this.view, this, cloudWorkspaceInfo));
-				}
-
-				for (const workspace of localWorkspaces) {
-					children.push(new WorkspaceNode(this.uri, this.view, this, workspace));
-				}
-
-				if (cloudWorkspaces.length === 0 && cloudWorkspaceInfo == null) {
-					children.push(new MessageNode(this.view, this, l10n.t('No cloud workspaces found.')));
+			} else {
+				for (const localWorkspace of localWorkspaces) {
+					children.push(new WorkspaceNode(this.uri, this.view, this, localWorkspace));
 				}
 
 				if (localWorkspaceInfo != null) {
@@ -90,7 +71,6 @@ export class WorkspacesView extends ViewBase<'workspaces', WorkspacesViewNode, W
 	constructor(container: Container) {
 		super(container, 'workspaces', l10n.t('Workspaces'), 'workspacesView');
 
-		this.description = previewBadge;
 		this.disposables.push(container.workspaces.onDidResetWorkspaces(() => void this.refresh(true)));
 	}
 
@@ -104,7 +84,6 @@ export class WorkspacesView extends ViewBase<'workspaces', WorkspacesViewNode, W
 	}
 
 	override async show(options?: { preserveFocus?: boolean | undefined }): Promise<void> {
-		if (!(await ensurePlusFeaturesEnabled())) return;
 		return super.show(options);
 	}
 
@@ -141,7 +120,6 @@ export class WorkspacesView extends ViewBase<'workspaces', WorkspacesViewNode, W
 
 	protected registerCommands(): Disposable[] {
 		return [
-			registerViewCommand(this.getQualifiedCommand('info'), () => openUrl(urls.workspaces), this),
 			registerViewCommand(
 				this.getQualifiedCommand('copy'),
 				() => executeCommand<CopyNodeCommandArgs>('gitlens.views.copy', this.activeSelection, this.selection),
@@ -151,39 +129,6 @@ export class WorkspacesView extends ViewBase<'workspaces', WorkspacesViewNode, W
 				this.getQualifiedCommand('refresh'),
 				() => {
 					this.container.workspaces.resetWorkspaces();
-				},
-				this,
-			),
-			registerViewCommand(this.getQualifiedCommand('addRepos'), async (node: WorkspaceNode) => {
-				await this.container.workspaces.addCloudWorkspaceRepos(node.workspace.id);
-				void node.getParent()?.triggerChange(true);
-			}),
-			registerViewCommand(this.getQualifiedCommand('addReposFromLinked'), async (node: RepositoriesNode) => {
-				await this.container.workspaces.addMissingCurrentWorkspaceRepos({ force: true });
-				void node.getParent()?.triggerChange(true);
-			}),
-			registerViewCommand(
-				this.getQualifiedCommand('convert'),
-				async (node: RepositoriesNode) => {
-					const repos: GlRepository[] = [];
-					for (const child of node.getChildren()) {
-						if (child instanceof RepositoryNode) {
-							repos.push(child.repo);
-						}
-					}
-
-					if (repos.length === 0) return;
-
-					await this.container.workspaces.createCloudWorkspace({ repos: repos });
-					void this.ensureRoot().triggerChange(true);
-				},
-				this,
-			),
-			registerViewCommand(
-				this.getQualifiedCommand('create'),
-				async () => {
-					await this.container.workspaces.createCloudWorkspace();
-					void this.ensureRoot().triggerChange(true);
 				},
 				this,
 			),
@@ -211,55 +156,6 @@ export class WorkspacesView extends ViewBase<'workspaces', WorkspacesViewNode, W
 					await this.container.workspaces.openCodeWorkspaceFile(node.workspace.id, {
 						location: 'newWindow',
 					});
-				},
-				this,
-			),
-			registerViewCommand(
-				this.getQualifiedCommand('changeAutoAddSetting'),
-				async () => {
-					await this.container.workspaces.chooseCodeWorkspaceAutoAddSetting({ current: true });
-				},
-				this,
-			),
-			registerViewCommand(
-				this.getQualifiedCommand('delete'),
-				async (node: WorkspaceNode) => {
-					await this.container.workspaces.deleteCloudWorkspace(node.workspace.id);
-					void node.getParent()?.triggerChange(true);
-				},
-				this,
-			),
-			registerViewCommand(
-				this.getQualifiedCommand('locateAllRepos'),
-				async (node: WorkspaceNode) => {
-					if (node.workspace.type !== 'cloud') return;
-
-					await window.withProgress(
-						{
-							location: ProgressLocation.Notification,
-							title: l10n.t("Locating Repositories for '{0}'...", node.workspace.name),
-							cancellable: true,
-						},
-						(_progress, token) =>
-							this.container.workspaces.locateAllCloudWorkspaceRepos(
-								node.workspace.id,
-								toAbortSignal(token),
-							),
-					);
-
-					void node.triggerChange(true);
-				},
-				this,
-			),
-			registerViewCommand(
-				this.getQualifiedCommand('repo.locate'),
-				async (node: RepositoryNode | WorkspaceMissingRepositoryNode) => {
-					const descriptor = node.wsRepositoryDescriptor;
-					if (descriptor == null || node.workspace?.id == null) return;
-
-					await this.container.workspaces.locateWorkspaceRepo(node.workspace.id, descriptor);
-
-					void node.getParent()?.triggerChange(true);
 				},
 				this,
 			),
@@ -298,17 +194,6 @@ export class WorkspacesView extends ViewBase<'workspaces', WorkspacesViewNode, W
 					openWorkspace(node.repo.uri, { location: 'addToWorkspace' });
 				},
 				this,
-			),
-			registerViewCommand(
-				this.getQualifiedCommand('repo.remove'),
-				async (node: RepositoryNode | WorkspaceMissingRepositoryNode) => {
-					const descriptor = node.wsRepositoryDescriptor;
-					if (descriptor?.id == null || node.workspace?.id == null) return;
-
-					await this.container.workspaces.removeCloudWorkspaceRepo(node.workspace.id, descriptor);
-					// TODO@axosoft-ramint Do we need the grandparent here?
-					void node.getParent()?.getParent()?.triggerChange(true);
-				},
 			),
 		];
 	}

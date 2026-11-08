@@ -2,7 +2,6 @@ import * as l10n from '@vscode/l10n';
 import type { PropertyValueMap, TemplateResult } from 'lit';
 import { css, html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { when } from 'lit/directives/when.js';
 import type { AgentSessionPhase } from '@gitlens/agents/types.js';
 import { isActiveAgentPhase } from '@gitlens/agents/types.js';
 import { localizedContent } from '@gitlens/components/localizedContent.js';
@@ -15,13 +14,11 @@ import type { AgentSessionState } from '../../../../agents/models/agentSessionSt
 import { getWipFileWebviewItem, serializeWebviewItemContext } from '../../../../system/webview.js';
 import type { DetailsItemTypedContext, Wip } from '../../../commitDetails/protocol.js';
 import { buildFolderContext } from '../../../commitDetails/protocol.js';
-import type { Change } from '../../../plus/patchDetails/protocol.js';
 import type { TreeItemAction, TreeItemBase, TreeItemCheckedDetail } from '../../shared/components/tree/base.js';
 import { detailsBaseStyles } from './gl-details-base.css.js';
 import type { File } from './gl-details-base.js';
 import { GlDetailsBase } from './gl-details-base.js';
 import { detailsWipPanelStyles } from './gl-details-wip-panel.css.js';
-import type { CreatePatchState, GenerateState } from './gl-inspect-patch.js';
 import '../../plus/graph/components/gl-details-wip-empty-pane.js';
 import '../../plus/shared/components/merge-rebase-status.js';
 import '../../shared/components/actions/action-nav.js';
@@ -179,9 +176,6 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 	@property({ type: Object })
 	pullRequest?: PullRequestShape;
 
-	@property({ type: Object })
-	generate?: GenerateState;
-
 	@property({ type: String, attribute: 'worktree-path' })
 	worktreePath?: string;
 
@@ -264,6 +258,7 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 		let hasAnyActive = false;
 		for (const s of sessions) {
 			if (!isActiveAgentPhase(s.phase)) continue;
+
 			if (s.fileActivity?.some(e => e.editing === true)) {
 				hasAnyActive = true;
 				break;
@@ -291,6 +286,7 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 						graceRemainingMs = agentTouchedGraceMs - effectiveAge;
 					}
 				}
+
 				if (!isLive && !inGrace) continue;
 
 				const normalized = normalizePath(entry.path);
@@ -305,6 +301,7 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 				if (existing !== 'working') {
 					touched.set(rel, s.phase);
 				}
+
 				if (inGrace && graceRemainingMs < earliestGraceRemainingMs) {
 					earliestGraceRemainingMs = graceRemainingMs;
 				}
@@ -317,6 +314,7 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 			clearTimeout(this._agentGraceTimer);
 			this._agentGraceTimer = undefined;
 		}
+
 		if (Number.isFinite(earliestGraceRemainingMs)) {
 			this._agentGraceTimer = setTimeout(() => {
 				this._agentGraceTimer = undefined;
@@ -342,8 +340,10 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 			for (const e of fa) {
 				sig += `\u0001${e.path}:${e.reading ? 'r' : ''}${e.editing ? 'e' : ''}`;
 			}
+
 			current.add(sig);
 		}
+
 		let changed = current.size !== this._lastFileActivitySigs.size;
 		if (!changed) {
 			for (const sig of current) {
@@ -353,6 +353,7 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 				}
 			}
 		}
+
 		this._lastFileActivitySigs = current;
 		return changed;
 	}
@@ -370,6 +371,7 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 			if (changedProperties.has('agentSessions') && this.fileActivityStructureChanged()) {
 				this._agentSnapshotReceivedAt = performance.now();
 			}
+
 			this._agentTouchedFiles = this.computeAgentTouchedFiles();
 		}
 	}
@@ -377,14 +379,6 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 	get isUnpublished(): boolean {
 		const branch = this.wip?.branch;
 		return branch?.upstream == null || branch.upstream.missing === true;
-	}
-
-	/** Inline Cloud Patch creation is showing. Parked: no trigger sets this yet. */
-	@state()
-	private creatingPatch = false;
-
-	get draftsEnabled(): boolean {
-		return this.orgSettings?.drafts === true;
 	}
 
 	get filesCount(): number {
@@ -399,73 +393,6 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 			ahead: branch.tracking?.ahead ?? 0,
 			behind: branch.tracking?.behind ?? 0,
 		};
-	}
-
-	@state()
-	patchCreateMetadata: { title: string | undefined; description: string | undefined } = {
-		title: undefined,
-		description: undefined,
-	};
-
-	get patchCreateState(): CreatePatchState {
-		const wip = this.wip!;
-		const key = wip.repo.uri;
-		const change: Change = {
-			type: 'wip',
-			repository: {
-				name: wip.repo.name,
-				path: wip.repo.path,
-				uri: wip.repo.uri,
-			},
-			revision: { to: uncommitted, from: 'HEAD' },
-			files: wip.changes?.files ?? [],
-			checked: true,
-		};
-
-		return {
-			...this.patchCreateMetadata,
-			changes: {
-				[key]: change,
-			},
-			creationError: undefined,
-			visibility: 'public',
-			userSelections: undefined,
-		};
-	}
-
-	protected override updated(changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>): void {
-		super.updated(changedProperties);
-
-		// Guard: wip may be null during mode transitions
-		if (this.wip == null) return;
-
-		if (changedProperties.has('generate')) {
-			this.patchCreateMetadata = {
-				title: this.generate?.title ?? this.patchCreateMetadata.title,
-				description: this.generate?.description ?? this.patchCreateMetadata.description,
-			};
-		}
-	}
-
-	private renderSecondaryAction(hasPrimary = true) {
-		if (!this.draftsEnabled || this.creatingPatch) return undefined;
-
-		const label = l10n.t('Share as Cloud Patch');
-		const action = 'create-patch';
-		if ((this.wip?.changes?.files.length ?? 0) === 0) return undefined;
-
-		return html`
-			<gl-button
-				?full=${!hasPrimary}
-				appearance="secondary"
-				data-action="${action}"
-				.tooltip=${hasPrimary ? label : undefined}
-				@click=${() => this.onDataActionClick(action)}
-			>
-				<code-icon icon="gl-cloud-patch-share" .slot=${!hasPrimary ? 'prefix' : nothing}></code-icon
-				>${!hasPrimary ? label : nothing}
-			</gl-button>
-		`;
 	}
 
 	private renderPrimaryAction() {
@@ -517,12 +444,9 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 
 	private renderActions() {
 		const primaryAction = this.renderPrimaryAction();
-		const secondaryAction = this.renderSecondaryAction(primaryAction != null);
-		if (primaryAction == null && secondaryAction == null) return nothing;
+		if (primaryAction == null) return nothing;
 
-		return html`<div class="section section--actions">
-			<button-container>${primaryAction}${secondaryAction}</button-container>
-		</div>`;
+		return html`<div class="section section--actions"><button-container>${primaryAction}</button-container></div>`;
 	}
 
 	private renderPullRequest() {
@@ -595,26 +519,6 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 		`;
 	}
 
-	private renderPatchCreation() {
-		if (!this.creatingPatch) return nothing;
-
-		// NOTE: `gl-inspect-patch` is deliberately NOT imported by this module. Nothing sets
-		// `creatingPatch`, so a top-level side-effect import pulled that element and its patch-create tree
-		// into every bundle rendering working changes, to draw something that can never appear. Whoever
-		// un-parks this feature must import it again — an unregistered element renders inert — and should
-		// do it lazily here rather than at module scope.
-
-		return html`<gl-inspect-patch
-			.orgSettings=${this.orgSettings}
-			.preferences=${this.preferences}
-			.generate=${this.generate}
-			.createState=${this.patchCreateState}
-			@gl-patch-create-patch=${(e: CustomEvent) => {
-				void this.dispatchEvent(new CustomEvent('gl-inspect-create-patch', { detail: e.detail }));
-			}}
-		></gl-inspect-patch>`;
-	}
-
 	override render(): unknown {
 		if (this.wip == null) return nothing;
 
@@ -623,7 +527,7 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 		}
 
 		const hasFiles = (this.files?.length ?? 0) > 0;
-		if (!hasFiles && !this.creatingPatch) {
+		if (!hasFiles) {
 			return html`
 				${this.renderActions()} ${this.renderPausedOpStatus()}
 				<gl-details-wip-empty-pane
@@ -645,8 +549,7 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 		return html`
 			${this.renderActions()} ${this.renderPausedOpStatus()}
 			<webview-pane-group flexible>
-				${this.renderPullRequest()}
-				${when(this.creatingPatch === false, () => this.renderChangedFiles('wip'))}${this.renderPatchCreation()}
+				${this.renderPullRequest()}${this.renderChangedFiles('wip')}
 			</webview-pane-group>
 		`;
 	}
@@ -671,6 +574,7 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 				<webview-pane-group flexible> ${this.renderChangedFiles('wip')} </webview-pane-group>
 			</div>`;
 		}
+
 		return html`
 			${this.renderEmbeddedHeader()}
 			<div class="files">
@@ -738,6 +642,7 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 			this._checkedBatch = { checked: e.detail.checked, repoPath: repoPath, files: [] };
 			queueMicrotask(() => this.flushCheckedBatch());
 		}
+
 		this._checkedBatch.files.push(file);
 	}
 
@@ -745,6 +650,7 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 		const batch = this._checkedBatch;
 		this._checkedBatch = undefined;
 		if (batch == null) return;
+
 		if (!batch.files.length) return;
 
 		const [first] = batch.files;
@@ -837,8 +743,10 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 						? conflictedCheckboxActionsWithDetailsResolve
 						: conflictedActionsWithDetailsResolve;
 				}
+
 				return this.checkboxMode ? conflictedCheckboxActionsWithDetails : conflictedActionsWithDetails;
 			}
+
 			return this.checkboxMode ? conflictedCheckboxActions : conflictedActions;
 		}
 
@@ -879,9 +787,11 @@ export class GlDetailsWipPanel extends GlDetailsBase {
 			if (canStageCurrent(conflictStatus)) {
 				modifiers.push('+canStageCurrent');
 			}
+
 			if (canStageIncoming(conflictStatus)) {
 				modifiers.push('+canStageIncoming');
 			}
+
 			webviewItem = `gitlens:file${modifiers.join('')}`;
 		} else {
 			webviewItem = getWipFileWebviewItem(file);

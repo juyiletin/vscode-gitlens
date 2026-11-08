@@ -1,5 +1,6 @@
 import * as assert from 'node:assert/strict';
 import { suite, test } from 'mocha';
+import { Emitter } from '@gitlens/utils/event.js';
 import { ConfiguredIntegrationService } from '../authentication/configuredIntegrationService.js';
 import type { ProviderAuthenticationSession } from '../authentication/models.js';
 import { GitCloudHostIntegrationId } from '../constants.js';
@@ -33,116 +34,96 @@ suite('createIntegrationManager — vertical-slice smoke', () => {
 		manager.dispose();
 	});
 
-	test('connectSecondary opens the connect flow even when the provider is already connected', async () => {
+	test('connectSecondary asks for a new credential even when the provider is connected', async () => {
 		const runtime = createFakeRuntime();
 		await new ConfiguredIntegrationService(runtime).storeSession(
 			GitCloudHostIntegrationId.GitHub,
 			cloudSession('tok1'),
 		);
-		let connectOptions: Parameters<typeof runtime.account.connect>[0] | undefined;
-		runtime.account.connect = async options => {
-			connectOptions = options;
-			return false;
-		};
-		const manager = createIntegrationManager(runtime);
+		const hooks = runtime.hooks!;
+		const changed = new Emitter<void>();
+		let prompts = 0;
+		hooks.createAuthenticationProvider = async () => ({
+			persistSessions: true,
+			onDidChange: changed.event,
+			getSession: async (_descriptor, options) => {
+				if (options?.createIfNeeded) {
+					prompts++;
+				}
 
-		const connected = await manager.connectSecondary(GitCloudHostIntegrationId.GitHub, { source: 'test' });
-
-		// The host connect flow was opened (not short-circuited by the already-connected provider)…
-		assert.deepEqual(connectOptions, {
-			integrationIds: [GitCloudHostIntegrationId.GitHub],
-			source: { source: 'test' },
+				return undefined;
+			},
+			deleteSession: async () => {},
+			deleteAllSessions: async () => {},
+			dispose: () => changed.dispose(),
 		});
-		// …but no new connection was added, so it reports false.
-		assert.equal(connected, false, 'reports false when no new connection was added');
-		manager.dispose();
-	});
-
-	test('connectSecondary reports true when a new connection is actually added', async () => {
-		const runtime = createFakeRuntime();
-		const configured = new ConfiguredIntegrationService(runtime);
-		// GitHub already has a primary connection.
-		await configured.storeSession(GitCloudHostIntegrationId.GitHub, cloudSession('tok1'));
-		runtime.account.getAccount = async () => ({ id: 'me' });
-		// The host connect flow succeeds and the backend now reports a second connection.
-		runtime.account.connect = async () => true;
-		runtime.account.fetchGkApi = (path: string) => {
-			const body =
-				path === 'v1/provider-tokens'
-					? {
-							data: [
-								{
-									tokenId: 'tok1',
-									provider: 'github',
-									type: 'oauth',
-									domain: '',
-									secondaries: [{ tokenId: 'tok2', provider: 'github', type: 'oauth', domain: '' }],
-								},
-							],
-						}
-					: {
-							data: {
-								tokenId: path.split('/').pop(),
-								accessToken: 'a',
-								expiresIn: 3600,
-								scopes: 'repo',
-								type: 'oauth',
-							},
-						};
-			return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
-		};
 		const manager = createIntegrationManager(runtime);
-
-		const connected = await manager.connectSecondary(GitCloudHostIntegrationId.GitHub, { source: 'test' });
-
-		assert.equal(connected, true, 'reports true when a new connection id was added');
-		assert.equal(
-			manager.getConfigured(GitCloudHostIntegrationId.GitHub).length,
-			2,
-			'both connections are now configured',
+		assert.equal(await manager.connectSecondary(GitCloudHostIntegrationId.GitHub, { source: 'test' }), false);
+		assert.equal(prompts, 1);
+		assert.deepEqual(
+			manager.getConfigured(GitCloudHostIntegrationId.GitHub).map(connection => connection.id),
+			['tok1'],
 		);
 		manager.dispose();
 	});
 
-	test('connectSecondary reports true when a new connection replaces the existing id', async () => {
+	test('connectSecondary persists a second direct connection while keeping its primary', async () => {
 		const runtime = createFakeRuntime();
-		const configured = new ConfiguredIntegrationService(runtime);
-		await configured.storeSession(GitCloudHostIntegrationId.GitHub, cloudSession('tok1'));
-		runtime.account.getAccount = async () => ({ id: 'me' });
-		runtime.account.connect = async () => true;
-		runtime.account.fetchGkApi = (path: string) => {
-			const body =
-				path === 'v1/provider-tokens'
-					? {
-							data: [
-								{
-									tokenId: 'tok2',
-									provider: 'github',
-									type: 'oauth',
-									domain: '',
-								},
-							],
-						}
-					: {
-							data: {
-								tokenId: path.split('/').pop(),
-								accessToken: 'a',
-								expiresIn: 3600,
-								scopes: 'repo',
-								type: 'oauth',
-							},
-						};
-			return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
-		};
+		await new ConfiguredIntegrationService(runtime).storeSession(
+			GitCloudHostIntegrationId.GitHub,
+			cloudSession('tok1'),
+		);
+		const hooks = runtime.hooks!;
+		const changed = new Emitter<void>();
+		hooks.createAuthenticationProvider = async () => ({
+			persistSessions: true,
+			onDidChange: changed.event,
+			getSession: async () => cloudSession('tok2'),
+			deleteSession: async () => {},
+			deleteAllSessions: async () => {},
+			dispose: () => changed.dispose(),
+		});
 		const manager = createIntegrationManager(runtime);
-
-		const connected = await manager.connectSecondary(GitCloudHostIntegrationId.GitHub, { source: 'test' });
-
-		assert.equal(connected, true, 'reports true when a new connection id replaces the old one');
+		assert.equal(await manager.connectSecondary(GitCloudHostIntegrationId.GitHub, { source: 'test' }), true);
 		assert.deepEqual(
-			manager.getConfigured(GitCloudHostIntegrationId.GitHub).map(c => c.id),
+			manager
+				.getConfigured(GitCloudHostIntegrationId.GitHub)
+				.map(connection => connection.id)
+				.sort(),
+			['tok1', 'tok2'],
+		);
+		assert.equal(
+			manager.getConfigured(GitCloudHostIntegrationId.GitHub).find(connection => connection.primary)?.id,
+			'tok1',
+		);
+		manager.dispose();
+	});
+
+	test('connectSecondary reports a replacement connection without reviving the retired account', async () => {
+		const runtime = createFakeRuntime();
+		await new ConfiguredIntegrationService(runtime).storeSession(
+			GitCloudHostIntegrationId.GitHub,
+			cloudSession('tok1'),
+		);
+		const hooks = runtime.hooks!;
+		const changed = new Emitter<void>();
+		let manager: ReturnType<typeof createIntegrationManager>;
+		hooks.createAuthenticationProvider = async () => ({
+			persistSessions: true,
+			onDidChange: changed.event,
+			getSession: async () => {
+				await manager.deleteConnection(GitCloudHostIntegrationId.GitHub, 'tok1');
+				return cloudSession('tok2');
+			},
+			deleteSession: async () => {},
+			deleteAllSessions: async () => {},
+			dispose: () => changed.dispose(),
+		});
+		manager = createIntegrationManager(runtime);
+		assert.equal(await manager.connectSecondary(GitCloudHostIntegrationId.GitHub, { source: 'test' }), true);
+		assert.deepEqual(
+			manager.getConfigured(GitCloudHostIntegrationId.GitHub).map(connection => connection.id),
 			['tok2'],
-			'only the replacement connection remains configured',
 		);
 		manager.dispose();
 	});

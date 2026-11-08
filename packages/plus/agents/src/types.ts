@@ -447,6 +447,8 @@ export interface AgentProviderCallbacks {
 	 * - Inject any environment-specific flags (e.g. `--insiders` when the host has insiders mode enabled)
 	 */
 	runCLICommand(args: string[], options?: { cwd?: string }): Promise<string>;
+	/** Whether the optional CLI is configured. When false, keep IPC sessions but skip CLI reads. */
+	canRunCLICommand?(): boolean;
 
 	/**
 	 * Resolve git metadata for a session's cwd. Returns the stable worktree path; the worktree's

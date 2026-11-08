@@ -14,31 +14,11 @@ import type { Container } from '../../../../container.js';
 import type { MarkdownContentMetadata } from '../../../../documents/markdown.js';
 import type { GitRepositoryService } from '../../../../git/gitRepositoryService.js';
 import { getCommitDate } from '../../../../git/utils/-webview/commit.utils.js';
-import type { DirectiveQuickPickItem } from '../../../../quickpicks/items/directive.js';
-import { createDirectiveQuickPickItem, Directive } from '../../../../quickpicks/items/directive.js';
 import { configuration } from '../../../../system/-webview/configuration.js';
-import { getContext } from '../../../../system/-webview/context.js';
 import { openSettingsEditor } from '../../../../system/-webview/vscode/editors.js';
 import type { OrgAIConfig, OrgAIProvider } from '../../../gk/models/organization.js';
 import type { Subscription } from '../../../gk/models/subscription.js';
-import { ensureAccountQuickPick } from '../../../gk/utils/-webview/acount.utils.js';
 import type { AIResponse, AIResultContext } from '../../aiProviderService.js';
-
-/** Built fresh per prompt so a quick pick never shares an item instance with another. */
-function createAIAccountDescriptionItem(): DirectiveQuickPickItem {
-	return createDirectiveQuickPickItem(Directive.Noop, undefined, {
-		label: l10n.t('Use AI-powered GitLens features like Generate Commit Message, Explain Commit, and more'),
-		iconPath: new ThemeIcon('sparkle'),
-	});
-}
-
-export async function ensureAccount(container: Container, silent: boolean): Promise<boolean> {
-	const result = await ensureAccountQuickPick(container, createAIAccountDescriptionItem(), { source: 'ai' }, silent);
-
-	if (!result && !silent) throw new CancellationError();
-
-	return result;
-}
 
 export async function getOrPromptApiKey(
 	container: Container,
@@ -53,12 +33,8 @@ export async function getOrPromptApiKey(
 ): Promise<string | undefined> {
 	let apiKey = await container.storage.getSecret(`gitlens.${provider.id}.key`);
 	if (apiKey) return apiKey;
-	if (silent) return undefined;
 
-	if (provider.requiresAccount) {
-		const result = await ensureAccount(container, false);
-		if (!result) return undefined;
-	}
+	if (silent) return undefined;
 
 	const input = window.createInputBox();
 	input.ignoreFocusOut = true;
@@ -155,6 +131,7 @@ export async function showLargePromptWarning(estimatedTokens: number, threshold:
 	if (result === changeThreshold) {
 		void openSettingsEditor({ query: 'gitlens.ai.largePromptWarningThreshold' });
 	}
+
 	return result === confirm;
 }
 
@@ -168,16 +145,18 @@ export function showPromptTruncationWarning(model: AIModel): void {
 
 export function getOrgAIConfig(): OrgAIConfig {
 	return {
-		aiEnabled: getContext('gitlens:gk:organization:ai:enabled', true),
-		enforceAiProviders: getContext('gitlens:gk:organization:ai:enforceProviders', false),
-		aiProviders: getContext('gitlens:gk:organization:ai:providers', {}),
+		aiEnabled: true,
+		enforceAiProviders: false,
+		aiProviders: {},
 	};
 }
 
 export function getOrgAIProviderOfType(type: AIProviders, orgAIConfig?: OrgAIConfig): OrgAIProvider {
 	orgAIConfig ??= getOrgAIConfig();
 	if (!orgAIConfig.aiEnabled) return { type: type, enabled: false };
+
 	if (!orgAIConfig.enforceAiProviders) return { type: type, enabled: true };
+
 	return orgAIConfig.aiProviders[type] ?? { type: type, enabled: false };
 }
 
@@ -187,24 +166,10 @@ export function isProviderEnabledByOrg(type: AIProviders, orgAIConfig?: OrgAICon
 
 export async function ensureAccess(
 	container: Container,
-	options?: { showPicker?: boolean },
+	_options?: { showPicker?: boolean },
 	source?: Source,
 ): Promise<boolean> {
-	const showPicker = options?.showPicker ?? false;
-
-	if (!container.ai.orgEnabled) {
-		if (showPicker) {
-			await window.showQuickPick([{ label: l10n.t('OK') }], {
-				title: l10n.t('AI is Disabled'),
-				placeHolder: l10n.t('GitLens AI features have been disabled by your GitKraken admin'),
-				canPickMany: false,
-			});
-		} else {
-			await window.showErrorMessage(l10n.t('AI features have been disabled by your GitKraken admin.'));
-		}
-
-		return false;
-	}
+	const showPicker = _options?.showPicker ?? false;
 
 	if (!container.ai.enabled) {
 		let reenable = false;
@@ -238,15 +203,7 @@ export async function ensureAccess(
 		return false;
 	}
 
-	// Every AI feature requires a verified account, so require one to select a provider/model too — otherwise
-	// you can pick a model you won't be able to use until you sign in. Scoped to the PICKER flows: callers that
-	// opted out gate the account themselves right after (`ensureFeatureAccess` → `ensureAccount`), so gating
-	// here too put a quick pick in front of their modal and cost a second uncached subscription read on the
-	// request path. `ensureAccountQuickPick` rather than `ensureAccount` because the latter throws on cancel,
-	// and our callers expect a boolean.
-	if (!showPicker) return true;
-
-	return ensureAccountQuickPick(container, createAIAccountDescriptionItem(), source ?? { source: 'ai' }, false);
+	return true;
 }
 
 /**

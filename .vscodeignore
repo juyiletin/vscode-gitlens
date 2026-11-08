@@ -35,6 +35,7 @@ tests/**
 .gitignore
 .mailmap
 .mcp.json
+.nvmrc
 .oxfmtrc.json
 .vscode-agent.json
 .vscode-test.mjs

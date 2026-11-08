@@ -126,21 +126,14 @@ export class GlSettingsApp extends SignalWatcherWebviewApp {
 			// Graph/Home do — this feeds `gl-settings-account` and the nav's avatar. Supertalk proxy properties
 			// are thenable at runtime.
 			/* eslint-disable @typescript-eslint/await-thenable -- Supertalk proxy properties are thenable at runtime */
-			const [
-				subscriptionSignal,
-				orgSettingsSignal,
-				avatarSignal,
-				hasAccountSignal,
-				orgCountSignal,
-				aiUsageSignal,
-			] = await Promise.all([
-				subscription.subscriptionState,
-				subscription.orgSettingsState,
-				subscription.avatarState,
-				subscription.hasAccountState,
-				subscription.organizationsCountState,
-				subscription.aiUsageState,
-			]);
+			const [subscriptionSignal, orgSettingsSignal, avatarSignal, hasAccountSignal, orgCountSignal] =
+				await Promise.all([
+					subscription.subscriptionState,
+					subscription.orgSettingsState,
+					subscription.avatarState,
+					subscription.hasAccountState,
+					subscription.organizationsCountState,
+				]);
 			/* eslint-enable @typescript-eslint/await-thenable */
 			this._subscriptionCtx.setValue(
 				{
@@ -149,7 +142,6 @@ export class GlSettingsApp extends SignalWatcherWebviewApp {
 					avatar: avatarSignal,
 					hasAccount: hasAccountSignal,
 					organizationsCount: orgCountSignal,
-					aiUsage: aiUsageSignal,
 				},
 				true,
 			);
@@ -162,13 +154,12 @@ export class GlSettingsApp extends SignalWatcherWebviewApp {
 			// see the equivalent note in commitDetails.ts.
 			this._eventsSubscription?.unsubscribe();
 			this._eventsSubscription = subscribe<SettingsServices>(this._rpc.connection!, async remoteServices => {
-				const [settings, integrations, ai, agents, walkthrough, notifications] = await Promise.all([
+				const [settings, integrations, ai, agents, walkthrough] = await Promise.all([
 					remoteServices.settings,
 					remoteServices.integrations,
 					remoteServices.ai,
 					remoteServices.agents,
 					remoteServices.walkthrough,
-					remoteServices.notifications,
 				]);
 
 				return subscribeAll([
@@ -207,11 +198,6 @@ export class GlSettingsApp extends SignalWatcherWebviewApp {
 						agents.onAgentsChanged(list => {
 							s.agents.set(list);
 						}),
-					// The Notifications category (its visibility, the nav's unread count, and the inbox)
-					() =>
-						notifications.onNotificationsChanged(state => {
-							s.notifications.set(state);
-						}),
 				]);
 			});
 			// Wait for the subscriptions to land before the initial fetch below, preserving the
@@ -230,9 +216,11 @@ export class GlSettingsApp extends SignalWatcherWebviewApp {
 			if (!context.scopes.some(([scope]) => scope === s.scope.get())) {
 				s.scope.set('user');
 			}
+
 			if (context.anchor) {
 				actions.openAnchor(context.anchor);
 			}
+
 			s.loading.set(false);
 
 			// Populate the shared-service signals progressively — the panels show
@@ -281,6 +269,7 @@ export class GlSettingsApp extends SignalWatcherWebviewApp {
 		if (this._search != null) {
 			this._search.value = '';
 		}
+
 		this._search?.focus();
 	}
 

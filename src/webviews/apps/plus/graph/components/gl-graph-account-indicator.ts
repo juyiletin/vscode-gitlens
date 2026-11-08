@@ -2,18 +2,14 @@ import { SignalWatcher } from '@lit-labs/signals';
 import { consume } from '@lit/context';
 import * as l10n from '@vscode/l10n';
 import { css, html, LitElement, nothing } from 'lit';
-import { customElement, query, state } from 'lit/decorators.js';
-import type { GlPopover } from '@gitlens/components/components/overlays/popover.js';
+import { customElement, state } from 'lit/decorators.js';
 import { focusableBaseStyles, focusOutlineButton } from '@gitlens/components/components/styles/lit/a11y.css.js';
 import { boxSizingBase } from '@gitlens/components/components/styles/lit/base.css.js';
-import { localizedContent } from '@gitlens/components/localizedContent.js';
 import type { GlExtensionCommands } from '../../../../../constants.commands.js';
-import type { Source } from '../../../../../constants.telemetry.js';
 import type { SubscriptionPlanIds } from '../../../../../plus/gk/models/subscription.js';
 import {
 	getSubscriptionEntitlement,
 	getSubscriptionPlanName,
-	isSubscriptionPaid,
 	isSubscriptionTrial,
 } from '../../../../../plus/gk/utils/subscription.utils.js';
 import { createCommandLink } from '../../../../../system/commands.js';
@@ -37,20 +33,12 @@ import '../../../shared/components/button.js';
 import '@gitlens/components/components/codeIcon.js';
 import '@gitlens/components/components/overlays/popover.js';
 import '../../../shared/components/progress-ring.js';
-import './account/account-chip.js';
 import './account/agents-chip.js';
-import './account/ai-chip.js';
 import './account/integrations-chip.js';
 
 declare global {
 	interface HTMLElementTagNameMap {
 		'gl-graph-account-indicator': GlGraphAccountIndicator;
-	}
-
-	interface GlobalEventHandlersEventMap {
-		/** Relayed from the account panel's "Send Feedback" action — this indicator has no feedback
-		 *  dialog of its own, so it hands the request up to `gl-graph-app`. */
-		'gl-graph-show-feedback': CustomEvent<void>;
 	}
 }
 
@@ -389,9 +377,6 @@ export class GlGraphAccountIndicator extends SignalWatcher(LitElement) {
 	@consume({ context: integrationsContext })
 	private _integrations?: IntegrationsState;
 
-	@query('gl-popover')
-	private _popover?: GlPopover;
-
 	@state()
 	private _open = false;
 
@@ -443,10 +428,6 @@ export class GlGraphAccountIndicator extends SignalWatcher(LitElement) {
 		return this._subscription?.subscription.get() !== undefined;
 	}
 
-	private get hasAccount(): boolean {
-		return this._subscription?.subscription.get()?.account != null;
-	}
-
 	private get aiEnabled(): boolean {
 		const state = this._ai?.state.get();
 		return (state?.enabled ?? false) && (state?.orgEnabled ?? false);
@@ -480,7 +461,7 @@ export class GlGraphAccountIndicator extends SignalWatcher(LitElement) {
 		if (!this.loaded) return false;
 
 		const integrations = this._integrations?.integrations.get() ?? [];
-		return !(this.hasAccount && integrations.some(i => i.connected));
+		return !integrations.some(i => i.connected);
 	}
 
 	override render(): unknown {
@@ -518,13 +499,6 @@ export class GlGraphAccountIndicator extends SignalWatcher(LitElement) {
 				<code-icon class="action-button__more" icon="chevron-down" aria-hidden="true"></code-icon>
 			</button>
 			<div slot="content" class="rollup">
-				<gl-account-chip
-					display="panel"
-					settings-nav
-					feedback
-					@gl-account-chip-feedback=${this.handleFeedbackClick}
-				></gl-account-chip>
-				<hr />
 				${this.renderAI()} ${this.renderAgents()}
 				<div class="rollup__section">
 					<p class="rollup__heading">${l10n.t('Integrations')}</p>
@@ -546,14 +520,6 @@ export class GlGraphAccountIndicator extends SignalWatcher(LitElement) {
 			</div>
 		</gl-popover>`;
 	}
-
-	/** The panel's "Send Feedback" action has no dialog of its own — hide the rollup popover (it would
-	 *  otherwise float over the feedback dialog) and hand the request up to `gl-graph-app`, which owns
-	 *  the single `gl-graph-feedback-dialog` instance. */
-	private handleFeedbackClick = (): void => {
-		void this._popover?.hide();
-		this.dispatchEvent(new CustomEvent('gl-graph-show-feedback', { bubbles: true, composed: true }));
-	};
 
 	/** Deep-links to the matching Settings section when a rollup section has nothing set up. */
 	private renderSetupCta(command: GlExtensionCommands, label: string): unknown {
@@ -586,7 +552,6 @@ export class GlGraphAccountIndicator extends SignalWatcher(LitElement) {
 		return html`<div class="rollup__section">
 			<p class="rollup__heading">${l10n.t('AI')}</p>
 			${this.aiEmpty ? this.renderSetupCta('gitlens.showSettingsPage!ai', l10n.t('Set up AI')) : nothing}
-			<gl-ai-chip></gl-ai-chip>
 		</div>`;
 	}
 
@@ -631,11 +596,10 @@ export class GlGraphAccountIndicator extends SignalWatcher(LitElement) {
 	 */
 	private renderFooter(): unknown {
 		const walkthrough = this.renderWalkthrough();
-		const referFriend = this.renderReferFriend();
-		if (walkthrough === nothing && referFriend === nothing) return nothing;
+		if (walkthrough === nothing) return nothing;
 
 		return html`<hr />
-			<div class="rollup__footer">${walkthrough}${referFriend}</div>`;
+			<div class="rollup__footer">${walkthrough}</div>`;
 	}
 
 	private renderWalkthrough(): unknown {
@@ -658,32 +622,6 @@ export class GlGraphAccountIndicator extends SignalWatcher(LitElement) {
 			></gl-progress-ring>
 			<span
 				>${graph ? l10n.t('Graph Walkthrough {done}/{total}', { done: progress.doneCount, total: progress.allCount }) : l10n.t('GitLens Walkthrough {done}/{total}', { done: progress.doneCount, total: progress.allCount })}</span
-			>
-		</a>`;
-	}
-
-	/**
-	 * Refer-a-friend, paid plans only — the referral pays out against a subscription, so there is nothing to
-	 * offer someone who isn't on one. Same guard the account panel used before this moved out of it.
-	 *
-	 * The whole row is the link, not just the "Refer a friend" half, so it matches the hover model every
-	 * other region of this popover uses. There's no `aria-label` on the anchor: its accessible name comes
-	 * from its own content, which already carries the offer terms alongside the verb — "Refer a friend —
-	 * give 50% off and get up to $20" — so a separate label would only duplicate what's already there.
-	 */
-	private renderReferFriend(): unknown {
-		const subscription = this._subscription?.subscription.get();
-		if (subscription == null || !isSubscriptionPaid(subscription)) return nothing;
-
-		return html`<a
-			class="rollup__item"
-			href=${createCommandLink<Source>('gitlens.plus.referFriend', { source: 'account' })}
-		>
-			<code-icon icon="gift" aria-hidden="true"></code-icon>
-			<span class="rollup__footer-note"
-				>${localizedContent(l10n.t('{link} — give 50% off and get up to $20'), {
-					link: html`<span class="rollup__footer-lead">${l10n.t('Refer a friend')}</span>`,
-				})}</span
 			>
 		</a>`;
 	}

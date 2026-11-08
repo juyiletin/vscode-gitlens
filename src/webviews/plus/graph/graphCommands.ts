@@ -2,11 +2,9 @@ import { createWipRowId } from '@gitkraken/commit-graph/wip/identity.js';
 import type { MessageItem, TextDocumentShowOptions, ViewColumn } from 'vscode';
 import { env, l10n, ProgressLocation, Uri, window } from 'vscode';
 import { getAcceptSequenceEditor, getSquashSequenceEditor } from '@env/git/squashEditor.js';
-import { undefinedOnGitWarning } from '@gitlens/git/errors.js';
 import type { GitBranch } from '@gitlens/git/models/branch.js';
 import type { GitCommit } from '@gitlens/git/models/commit.js';
 import { GitContributor } from '@gitlens/git/models/contributor.js';
-import type { GitFileChangeShape } from '@gitlens/git/models/fileChange.js';
 import type { GitGraph, GitGraphRow } from '@gitlens/git/models/graph.js';
 import type { GitGraphSession } from '@gitlens/git/models/graphSession.js';
 import type { GitPausedOperationStatus } from '@gitlens/git/models/pausedOperationStatus.js';
@@ -96,7 +94,6 @@ import { getBestRemoteWithIntegration } from '../../../git/utils/-webview/remote
 import { getWorktreesByBranch } from '../../../git/utils/-webview/worktree.utils.js';
 import type { RebaseTodoAction } from '../../../git/utils/rebaseTodo.js';
 import { showGenericErrorMessage } from '../../../messages.js';
-import { showPatchesView } from '../../../plus/drafts/actions.js';
 import { getPullRequestBranchDeepLink } from '../../../plus/launchpad/launchpadProvider.js';
 import { setupPullRequestBranch } from '../../../plus/launchpad/utils/-webview/startReview.utils.js';
 import type { AssociateIssueWithBranchCommandArgs } from '../../../plus/startWork/associateIssueWithBranch.js';
@@ -112,7 +109,6 @@ import type { WebviewItemContext } from '../../../system/webview.js';
 import { isWebviewItemContext } from '../../../system/webview.js';
 import { DeepLinkActionType } from '../../../uris/deepLinks/deepLink.js';
 import type { BranchAndTargetRefs, BranchRef } from '../../shared/branchRefs.js';
-import type { Change } from '../patchDetails/protocol.js';
 import * as branchRefCommands from '../shared/branchRefCommands.js';
 import type { DetailsItemTypedContext } from './detailsProtocol.js';
 import type { SelectedRowState } from './graphWebview.js';
@@ -639,6 +635,7 @@ export class GraphCommands {
 			const branch = await this.repository?.git.branches.getBranch();
 			ref = branch != null ? getReferenceFromBranch(branch) : undefined;
 		}
+
 		if (ref == null) return;
 
 		await RepoActions.push(ref.repoPath, undefined, ref);
@@ -653,6 +650,7 @@ export class GraphCommands {
 			const branch = await this.repository?.git.branches.getBranch();
 			ref = branch != null ? getReferenceFromBranch(branch) : undefined;
 		}
+
 		if (ref == null) return;
 
 		// Opens the push wizard's no-remotes chooser (Publish Repository… / Add Remote…) with Publish Repository pre-selected
@@ -1012,6 +1010,7 @@ export class GraphCommands {
 			void window.showWarningMessage(l10n.t('Unable to reword: the root commit has no parent to rebase onto.'));
 			return;
 		}
+
 		if ((row?.parents.length ?? 0) > 1) {
 			void window.showWarningMessage(l10n.t('Unable to reword: cannot reword a merge commit.'));
 			return;
@@ -1027,6 +1026,7 @@ export class GraphCommands {
 		} catch {
 			// Ignore — fall back to opening the message editor without the published warning.
 		}
+
 		if (published) {
 			const confirm: MessageItem = { title: l10n.t('Reword') };
 			const cancel: MessageItem = { title: l10n.t('Cancel'), isCloseAffordance: true };
@@ -1065,11 +1065,13 @@ export class GraphCommands {
 				);
 				return;
 			}
+
 			if (row.parents.length > 1) {
 				void window.showWarningMessage(l10n.t('Unable to fixup: cannot fixup a merge commit.'));
 				return;
 			}
 		}
+
 		if (!this.validateRewriteableSelection(graph, [ref], 'fixup')) return;
 
 		let subject: string;
@@ -1139,6 +1141,7 @@ export class GraphCommands {
 				oldestTargetIndex = targetIndex;
 			}
 		}
+
 		if (oldestTargetIndex == null) {
 			void window.showWarningMessage(l10n.t("Couldn't locate the fixup targets on the current branch."));
 			return;
@@ -1600,66 +1603,6 @@ export class GraphCommands {
 		return Promise.resolve();
 	}
 
-	@command('gitlens.graph.shareAsCloudPatch')
-	@command('gitlens.graph.createPatch')
-	@command('gitlens.createCloudPatch:')
-	@debug()
-	private async shareAsCloudPatch(item?: GraphItemContext) {
-		const ref = this.getGraphItemRef(item, 'revision') ?? this.getGraphItemRef(item, 'stash');
-
-		if (ref == null) return Promise.resolve();
-
-		const { summary: title, body: description } = splitMessage(ref.message);
-		return executeCommand<CreatePatchCommandArgs, void>('gitlens.createCloudPatch', {
-			to: ref.ref,
-			repoPath: ref.repoPath,
-			title: title,
-			description: description,
-		});
-	}
-
-	@command('gitlens.shareWipAsCloudPatch:')
-	@debug()
-	private async shareWipAsCloudPatch(args?: { repoPath?: string }) {
-		const repo = args?.repoPath != null ? this.container.git.getRepository(args.repoPath) : this.repository;
-		if (repo == null) return;
-
-		const status = await repo.git.status.getStatus().catch(undefinedOnGitWarning);
-		if (status == null) {
-			void window.showErrorMessage(l10n.t('Unable to create cloud patch'));
-			return;
-		}
-
-		const files: GitFileChangeShape[] = [];
-		for (const file of status.files) {
-			const change = {
-				repoPath: file.repoPath,
-				path: file.path,
-				status: file.status,
-				originalPath: file.originalPath,
-				staged: file.staged,
-			};
-
-			files.push(change);
-			if (file.staged && file.wip) {
-				files.push({ ...change, staged: false });
-			}
-		}
-
-		const change: Change = {
-			type: 'wip',
-			repository: {
-				name: repo.name,
-				path: repo.path,
-				uri: repo.uri.toString(),
-			},
-			files: files,
-			revision: { to: uncommitted, from: 'HEAD' },
-		};
-
-		void showPatchesView({ mode: 'create', create: { changes: [change] } });
-	}
-
 	@command('gitlens.copyPatchToClipboard:')
 	@debug()
 	private async copyPatchToClipboard(item?: GraphItemContext) {
@@ -1722,6 +1665,7 @@ export class GraphCommands {
 	private resetToTag(item?: GraphItemContext) {
 		const ref = this.getGraphItemRef(item, 'tag');
 		if (ref == null) return Promise.resolve();
+
 		return RepoActions.reset(ref.repoPath, ref);
 	}
 
@@ -1981,6 +1925,7 @@ export class GraphCommands {
 		} else {
 			remoteName = (await getBestRemoteWithIntegration(value.repoPath))?.name;
 		}
+
 		if (remoteName == null) return undefined;
 
 		const upstreamName = `${remoteName}/${headBranch}`;
@@ -2171,6 +2116,7 @@ export class GraphCommands {
 		for (const b of branches.values()) {
 			if (!b.remote && b.upstream?.name === upstreamName && !b.upstream.missing) return b.name;
 		}
+
 		return undefined;
 	}
 
@@ -2443,6 +2389,7 @@ export class GraphCommands {
 			});
 			this._ensuringRevisions.set(key, promise);
 		}
+
 		return promise;
 	}
 
@@ -2592,6 +2539,7 @@ export class GraphCommands {
 		while (taken.has(`${name}-${n}`)) {
 			n++;
 		}
+
 		return `${name}-${n}`;
 	}
 
@@ -2629,6 +2577,7 @@ export class GraphCommands {
 	private async openPullRequestChanges(item?: GraphItemContext | BranchRef) {
 		const pr = await this.resolvePullRequestForComparison(item);
 		if (pr == null) return;
+
 		if (!(await this.ensurePullRequestRevisions(pr))) return;
 
 		const refs = getComparisonRefsForPullRequest(pr.repoPath, pr.refs!);
@@ -2644,6 +2593,7 @@ export class GraphCommands {
 	private async openPullRequestComparison(item?: GraphItemContext | BranchRef) {
 		const pr = await this.resolvePullRequestForComparison(item);
 		if (pr == null) return;
+
 		if (!(await this.ensurePullRequestRevisions(pr))) return;
 
 		// The graph's own compare sheet, seeded with the pull request's base and head. Both refs are named
@@ -3286,6 +3236,7 @@ export class GraphCommands {
 			if (item.webviewItemValue.worktreePath != null) {
 				openTerminal({ cwd: Uri.file(item.webviewItemValue.worktreePath) }).show();
 			}
+
 			return;
 		}
 
@@ -3570,6 +3521,7 @@ export class GraphCommands {
 				.branches.getBranch(item.branchName);
 			return branch != null ? getReferenceFromBranch(branch) : undefined;
 		}
+
 		return this.getGraphItemRef(item, 'branch');
 	}
 
@@ -3646,6 +3598,7 @@ export class GraphCommands {
 
 			return this.getGraphItemBranchWorktree(ref.repoPath, ref.id);
 		}
+
 		if (isGraphItemRefContext(item, 'revision')) {
 			const { ref, worktreePath } = item.webviewItemValue;
 			// Secondary WIP row: ref.ref is `uncommitted` AND ref.repoPath is the worktree's own
@@ -3667,8 +3620,10 @@ export class GraphCommands {
 				);
 				if (worktree != null) return worktree;
 			}
+
 			return this._graphSession?.current.worktrees?.find(w => w.sha === ref.ref);
 		}
+
 		return undefined;
 	}
 
@@ -3700,15 +3655,19 @@ export class GraphCommands {
 				if (!isGraphItemRefContext(item, 'branch') && !isGraphItemTypedContext(item, 'upstreamStatus')) {
 					return { active: undefined, selection: [] };
 				}
+
 				break;
 			case 'revision':
 				if (!isGraphItemRefContext(item, 'revision')) return { active: undefined, selection: [] };
+
 				break;
 			case 'stash':
 				if (!isGraphItemRefContext(item, 'stash')) return { active: undefined, selection: [] };
+
 				break;
 			case 'tag':
 				if (!isGraphItemRefContext(item, 'tag')) return { active: undefined, selection: [] };
+
 				break;
 			default:
 				if (!isGraphItemRefContext(item)) return { active: undefined, selection: [] };
@@ -3718,6 +3677,7 @@ export class GraphCommands {
 		if (!selection.length) {
 			selection.push(item.webviewItemValue.ref);
 		}
+
 		return { active: item.webviewItemValue.ref, selection: selection };
 	}
 }

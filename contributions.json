@@ -722,27 +722,6 @@
 				]
 			}
 		},
-		"gitlens.ai.mcp.install": {
-			"label": "Install GitKraken MCP Server",
-			"commandPalette": "!gitlens:untrusted && !gitlens:gk:cli:installed"
-		},
-		"gitlens.ai.mcp.installForAgent": {
-			"label": "Install GitKraken MCP for Agent"
-		},
-		"gitlens.ai.mcp.installForAllAgents": {
-			"label": "Connect GitKraken MCP to All Detected Agents",
-			"commandPalette": "!gitlens:untrusted && gitlens:gk:cli:installed"
-		},
-		"gitlens.ai.mcp.reinstall": {
-			"label": "Reinstall GitKraken MCP Server",
-			"commandPalette": "!gitlens:untrusted && gitlens:gk:cli:installed"
-		},
-		"gitlens.ai.mcp.uninstallForAgent": {
-			"label": "Uninstall GitKraken MCP for Agent"
-		},
-		"gitlens.ai.purchaseCredits": {
-			"label": "Get More AI Credits"
-		},
 		"gitlens.ai.recomposeBranch": {
 			"label": "Recompose Commits...",
 			"commandPalette": "gitlens:enabled && !gitlens:readonly && !gitlens:untrusted && gitlens:ai:allowed"
@@ -2222,43 +2201,6 @@
 				]
 			}
 		},
-		"gitlens.createCloudPatch": {
-			"label": "Create Patch...",
-			"commandPalette": "gitlens:enabled && gitlens:gk:organization:drafts:enabled && config.gitlens.cloudPatches.enabled",
-			"menus": {
-				"gitlens/commit/file/commit": [
-					{
-						"when": "viewItem =~ /gitlens:file\\b(?=.*?\\b\\+committed\\b)/ && !gitlens:untrusted && !gitlens:hasVirtualFolders && gitlens:gk:organization:drafts:enabled && config.gitlens.cloudPatches.enabled",
-						"group": "1_gitlens_secondary_actions",
-						"order": 3
-					}
-				],
-				"view/item/context": [
-					{
-						"when": "viewItem =~ /gitlens:(commit|stash)\\b/ && !listMultiSelection && !gitlens:untrusted && !gitlens:hasVirtualFolders && gitlens:gk:organization:drafts:enabled && config.gitlens.cloudPatches.enabled",
-						"group": "1_gitlens_actions_1",
-						"order": 3
-					},
-					{
-						"when": "viewItem =~ /gitlens:compare:results(?!:)\\b/ && !listMultiSelection && !gitlens:untrusted && !gitlens:hasVirtualFolders && gitlens:gk:organization:drafts:enabled && config.gitlens.cloudPatches.enabled",
-						"group": "1_gitlens_secondary_actions",
-						"order": 2
-					}
-				]
-			}
-		},
-		"gitlens.createCloudPatch:graph": {
-			"label": "Create Patch...",
-			"menus": {
-				"webview/context": [
-					{
-						"when": "webviewItem =~ /gitlens:(commit|stash)\\b/ && !listMultiSelection && !gitlens:untrusted && !gitlens:hasVirtualFolders && gitlens:gk:organization:drafts:enabled && config.gitlens.cloudPatches.enabled",
-						"group": "1_gitlens_actions_1",
-						"order": 3
-					}
-				]
-			}
-		},
 		"gitlens.createPatch": {
 			"label": "Create Patch...",
 			"commandPalette": "false && gitlens:enabled && !gitlens:untrusted && !gitlens:hasVirtualFolders",
@@ -3303,10 +3245,6 @@
 				}
 			]
 		},
-		"gitlens.gk.switchOrganization": {
-			"label": "Switch Organization...",
-			"commandPalette": "gitlens:gk:hasOrganizations"
-		},
 		"gitlens.graph.addAuthor": {
 			"label": "Add as Co-author",
 			"icon": "$(person-add)",
@@ -3878,18 +3816,6 @@
 						"when": "webviewItem =~ /gitlens:branch\\b(?=.*?\\b\\+worktree\\b)/ && !listMultiSelection",
 						"group": "7_gitlens_cutcopypaste",
 						"order": 4
-					}
-				]
-			}
-		},
-		"gitlens.graph.createPatch": {
-			"label": "Create Patch...",
-			"menus": {
-				"webview/context": [
-					{
-						"when": "!listMultiSelection && false && !gitlens:untrusted && !gitlens:hasVirtualFolders && webviewItem =~ /gitlens:(commit|stash)\\b/",
-						"group": "1_gitlens_actions_1",
-						"order": 2
 					}
 				]
 			}
@@ -4885,19 +4811,6 @@
 				]
 			}
 		},
-		"gitlens.graph.sendFeedback": {
-			"label": "Send Feedback...",
-			"icon": "$(feedback)",
-			"menus": {
-				"editor/title": [
-					{
-						"when": "activeWebviewPanelId === gitlens.graph",
-						"group": "navigation",
-						"order": -101
-					}
-				]
-			}
-		},
 		"gitlens.graph.setLaneDensityToCompact": {
 			"label": "Use Compact Density Graph Column Lanes",
 			"menus": {
@@ -4960,18 +4873,6 @@
 						"when": "webviewItem =~ /gitlens:graph:(columns|settings)\\b/",
 						"group": "1_view",
 						"order": 3
-					}
-				]
-			}
-		},
-		"gitlens.graph.shareAsCloudPatch": {
-			"label": "Share as Cloud Patch...",
-			"menus": {
-				"gitlens/share": [
-					{
-						"when": "webviewItem =~ /gitlens:(commit|stash)\\b/ && !listMultiSelection && !gitlens:untrusted && !gitlens:hasVirtualFolders && gitlens:gk:organization:drafts:enabled && config.gitlens.cloudPatches.enabled",
-						"group": "1_a_gitlens",
-						"order": 1
 					}
 				]
 			}
@@ -6609,10 +6510,6 @@
 			"label": "Paste Copied Changes (Patch)",
 			"commandPalette": "gitlens:enabled && !gitlens:untrusted && !gitlens:hasVirtualFolders"
 		},
-		"gitlens.plus.accountStatus": {
-			"label": "Account Status (Debugging)",
-			"commandPalette": "gitlens:enabled && gitlens:debugging"
-		},
 		"gitlens.plus.cloudIntegrations.connect": {
 			"label": "Connect Integrations..."
 		},
@@ -6624,35 +6521,6 @@
 			"label": "Hide Pro Features",
 			"commandPalette": "config.gitlens.plusFeatures.enabled"
 		},
-		"gitlens.plus.login": {
-			"label": "Sign In to GitKraken...",
-			"commandPalette": "!gitlens:plus",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem == gitlens:message:signin",
-						"group": "inline",
-						"order": 1
-					}
-				]
-			}
-		},
-		"gitlens.plus.logout": {
-			"label": "Sign Out of GitKraken",
-			"commandPalette": true
-		},
-		"gitlens.plus.manage": {
-			"label": "Manage Your Account...",
-			"commandPalette": "gitlens:plus"
-		},
-		"gitlens.plus.reactivateProTrial": {
-			"label": "Reactivate Pro Trial",
-			"commandPalette": "gitlens:plus:state == 5"
-		},
-		"gitlens.plus.referFriend": {
-			"label": "Refer a friend",
-			"commandPalette": "gitlens:plus:state == 6"
-		},
 		"gitlens.plus.refreshRepositoryAccess": {
 			"label": "Refresh Repository Access",
 			"commandPalette": "gitlens:enabled"
@@ -6661,28 +6529,12 @@
 			"label": "Restore Pro Features",
 			"commandPalette": "!config.gitlens.plusFeatures.enabled"
 		},
-		"gitlens.plus.signUp": {
-			"label": "Sign Up for GitKraken...",
-			"commandPalette": "!gitlens:plus"
-		},
 		"gitlens.plus.simulate.ai": {
 			"label": "Simulate AI Provider (Debugging)",
 			"commandPalette": "gitlens:enabled && gitlens:debugging"
 		},
-		"gitlens.plus.simulate.notifications": {
-			"label": "Simulate Notifications (Debugging)",
-			"commandPalette": "gitlens:enabled && gitlens:debugging"
-		},
-		"gitlens.plus.simulate.subscription": {
-			"label": "Simulate Subscription (Debugging)",
-			"commandPalette": "gitlens:enabled && gitlens:debugging"
-		},
-		"gitlens.plus.upgrade": {
-			"label": "Upgrade to Pro...",
-			"commandPalette": true
-		},
 		"gitlens.plus.validate": {
-			"label": "Refresh Account",
+			"label": "Refresh Local Features",
 			"commandPalette": "gitlens:plus"
 		},
 		"gitlens.pruneRemote:graph": {
@@ -7725,57 +7577,6 @@
 				]
 			}
 		},
-		"gitlens.shareAsCloudPatch": {
-			"label": "Share as Cloud Patch...",
-			"commandPalette": "gitlens:enabled && gitlens:gk:organization:drafts:enabled && config.gitlens.cloudPatches.enabled",
-			"menus": {
-				"git.changes": [
-					{
-						"when": "gitlens:enabled && scmProvider == git",
-						"group": "gitlens",
-						"order": 5
-					}
-				],
-				"gitlens/share": [
-					{
-						"when": "viewItem =~ /gitlens:(commit|file\\b(?=.*?\\b\\+committed\\b)(?!.*?\\+submodule)|stash|compare:results(?!:))\\b/ && !listMultiSelection && !gitlens:untrusted && !gitlens:hasVirtualFolders && gitlens:gk:organization:drafts:enabled && config.gitlens.cloudPatches.enabled",
-						"group": "1_a_gitlens",
-						"order": 1
-					}
-				],
-				"scm/resourceGroup/context": [
-					{
-						"when": "scmResourceGroup =~ /^(workingTree|index)$/ && scmProvider == git && gitlens:enabled && config.gitlens.menus.scmGroup.patch",
-						"group": "7_cutcopypaste",
-						"order": 98
-					}
-				]
-			}
-		},
-		"gitlens.shareAsCloudPatch:commitDetails": {
-			"label": "Share as Cloud Patch...",
-			"menus": {
-				"gitlens/share": [
-					{
-						"when": "webviewItem =~ /gitlens:file\\b(?=.*?\\b\\+committed\\b)(?!.*?\\+submodule)/ && !listMultiSelection && !gitlens:untrusted && !gitlens:hasVirtualFolders && gitlens:gk:organization:drafts:enabled && config.gitlens.cloudPatches.enabled && webview == gitlens.views.commitDetails",
-						"group": "1_a_gitlens",
-						"order": 1
-					}
-				]
-			}
-		},
-		"gitlens.shareAsCloudPatch:graphDetails": {
-			"label": "Share as Cloud Patch...",
-			"menus": {
-				"gitlens/share": [
-					{
-						"when": "webviewItem =~ /gitlens:file\\b((?=.*?\\b\\+committed\\b)|:comparison)(?!.*?\\+submodule)/ && !listMultiSelection && !gitlens:untrusted && !gitlens:hasVirtualFolders && gitlens:gk:organization:drafts:enabled && config.gitlens.cloudPatches.enabled && (webview == gitlens.graph || webview == gitlens.views.graph)",
-						"group": "1_a_gitlens",
-						"order": 1
-					}
-				]
-			}
-		},
 		"gitlens.shareFeedback": {
 			"label": "Share Feedback (GitHub)",
 			"icon": "$(feedback)",
@@ -7857,10 +7658,6 @@
 		"gitlens.showContributorsView": {
 			"label": "Show Contributors View",
 			"commandPalette": "gitlens:enabled"
-		},
-		"gitlens.showDraftsView": {
-			"label": "Show Cloud Patches View",
-			"commandPalette": "gitlens:enabled && gitlens:gk:organization:drafts:enabled"
 		},
 		"gitlens.showFileHistoryView": {
 			"label": "Show File History View",
@@ -8079,10 +7876,6 @@
 					}
 				]
 			}
-		},
-		"gitlens.showPatchDetailsPage": {
-			"label": "Show Patch Details",
-			"commandPalette": "gitlens:enabled && gitlens:gk:organization:drafts:enabled && config.gitlens.cloudPatches.enabled"
 		},
 		"gitlens.showQuickBranchHistory": {
 			"label": "Show Branch History",
@@ -8540,10 +8333,6 @@
 					}
 				]
 			}
-		},
-		"gitlens.showSettingsPage!notifications": {
-			"label": "Open Notifications",
-			"icon": "$(gear)"
 		},
 		"gitlens.showSettingsPage!remotes-view": {
 			"label": "Open View Settings",
@@ -12597,158 +12386,6 @@
 				]
 			}
 		},
-		"gitlens.views.draft.open": {
-			"label": "Open",
-			"icon": "$(eye)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem =~ /gitlens:draft\\b/ && gitlens:plus",
-						"group": "1_gitlens_actions",
-						"order": 1
-					}
-				]
-			}
-		},
-		"gitlens.views.draft.openOnWeb": {
-			"label": "Open on gitkraken.dev",
-			"icon": "$(globe)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem =~ /gitlens:draft\\b/ && gitlens:plus",
-						"group": "inline",
-						"order": 99
-					},
-					{
-						"when": "viewItem =~ /gitlens:draft\\b/ && gitlens:plus",
-						"group": "1_gitlens_actions",
-						"order": 2
-					}
-				]
-			}
-		},
-		"gitlens.views.drafts.copy": {
-			"label": "Copy",
-			"keybindings": [
-				{
-					"key": "ctrl+c",
-					"when": "focusedView == gitlens.views.drafts",
-					"mac": "cmd+c"
-				}
-			]
-		},
-		"gitlens.views.drafts.create": {
-			"label": "Create Cloud Patch...",
-			"icon": "$(add)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem == gitlens:views:drafts && gitlens:plus",
-						"group": "inline",
-						"order": 1
-					}
-				],
-				"view/title": [
-					{
-						"when": "view == gitlens.views.drafts && gitlens:plus",
-						"group": "navigation",
-						"order": 1
-					}
-				]
-			}
-		},
-		"gitlens.views.drafts.delete": {
-			"label": "Delete Cloud Patch...",
-			"icon": "$(trash)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem =~ /gitlens:draft\\b(?=.*?\\b\\+mine\\b)/ && gitlens:plus",
-						"group": "6_gitlens_actions",
-						"order": 1
-					}
-				]
-			}
-		},
-		"gitlens.views.drafts.info": {
-			"label": "Learn about Cloud Patches...",
-			"icon": "$(info)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem == gitlens:views:drafts && gitlens:walkthroughSupported",
-						"group": "8_info",
-						"order": 1
-					}
-				],
-				"view/title": [
-					{
-						"when": "view == gitlens.views.drafts && gitlens:walkthroughSupported",
-						"group": "8_info",
-						"order": 1
-					}
-				]
-			}
-		},
-		"gitlens.views.drafts.refresh": {
-			"label": "Refresh",
-			"icon": "$(refresh)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem == gitlens:views:drafts",
-						"group": "inline",
-						"order": 99
-					}
-				],
-				"view/title": [
-					{
-						"when": "view == gitlens.views.drafts",
-						"group": "navigation",
-						"order": 99
-					}
-				]
-			}
-		},
-		"gitlens.views.drafts.setShowAvatarsOff": {
-			"label": "Hide Avatars",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem == gitlens:views:drafts && config.gitlens.views.drafts.avatars",
-						"group": "5_gitlens",
-						"order": 1
-					}
-				],
-				"view/title": [
-					{
-						"when": "view == gitlens.views.drafts && config.gitlens.views.drafts.avatars",
-						"group": "5_gitlens",
-						"order": 1
-					}
-				]
-			}
-		},
-		"gitlens.views.drafts.setShowAvatarsOn": {
-			"label": "Show Avatars",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem == gitlens:views:drafts && !config.gitlens.views.drafts.avatars",
-						"group": "5_gitlens",
-						"order": 1
-					}
-				],
-				"view/title": [
-					{
-						"when": "view == gitlens.views.drafts && !config.gitlens.views.drafts.avatars",
-						"group": "5_gitlens",
-						"order": 1
-					}
-				]
-			}
-		},
 		"gitlens.views.editNode": {
 			"label": "Edit...",
 			"icon": "$(edit)",
@@ -13362,19 +12999,6 @@
 						"when": "view == gitlens.views.graph",
 						"group": "navigation",
 						"order": -99
-					}
-				]
-			}
-		},
-		"gitlens.views.graph.sendFeedback": {
-			"label": "Send Feedback...",
-			"icon": "$(feedback)",
-			"menus": {
-				"view/title": [
-					{
-						"when": "view == gitlens.views.graph",
-						"group": "navigation",
-						"order": -101
 					}
 				]
 			}
@@ -14537,46 +14161,6 @@
 						"when": "viewItem =~ /gitlens:autolinked:item\\b/ && listMultiSelection",
 						"group": "1_gitlens_actions",
 						"order": 99
-					}
-				]
-			}
-		},
-		"gitlens.views.patchDetails.close": {
-			"label": "Close Patch",
-			"icon": "$(close)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem == gitlens:views:patchDetails",
-						"group": "inline",
-						"order": 99
-					}
-				],
-				"view/title": [
-					{
-						"when": "view == gitlens.views.patchDetails",
-						"group": "navigation",
-						"order": 99
-					}
-				]
-			}
-		},
-		"gitlens.views.patchDetails.refresh": {
-			"label": "Refresh",
-			"icon": "$(refresh)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem == gitlens:views:patchDetails",
-						"group": "inline",
-						"order": 98
-					}
-				],
-				"view/title": [
-					{
-						"when": "view == gitlens.views.patchDetails",
-						"group": "navigation",
-						"order": 98
 					}
 				]
 			}
@@ -19983,66 +19567,6 @@
 				]
 			}
 		},
-		"gitlens.views.workspaces.addRepos": {
-			"label": "Add Repositories...",
-			"icon": "$(add)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem =~ /gitlens:workspace\\b(?=.*?\\b\\+cloud\\b)/",
-						"group": "inline",
-						"order": 1
-					},
-					{
-						"when": "viewItem =~ /gitlens:workspace\\b(?=.*?\\b\\+cloud\\b)/ && !listMultiSelection",
-						"group": "1_gitlens_actions",
-						"order": 1
-					}
-				]
-			}
-		},
-		"gitlens.views.workspaces.addReposFromLinked": {
-			"label": "Add Repositories from Linked Workspace...",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem =~ /gitlens:repositories\\b(?=.*?\\b\\+linked\\b)(?=.*?\\b\\+current\\b)/ && !listMultiSelection",
-						"group": "1_gitlens_actions",
-						"order": 3
-					}
-				]
-			}
-		},
-		"gitlens.views.workspaces.changeAutoAddSetting": {
-			"label": "Change Linked Workspace Auto-Add Behavior...",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem =~ /(gitlens:workspace\\b(?=.*?\\b\\+(cloud|local)\\b)(?=.*?\\b\\+current\\b)(?=.*?\\b\\+hasPath\\b)|gitlens:repositories\\b(?=.*?\\b\\+linked\\b))/ && !listMultiSelection",
-						"group": "2_gitlens_quickopen",
-						"order": 6
-					}
-				]
-			}
-		},
-		"gitlens.views.workspaces.convert": {
-			"label": "Convert to Cloud Workspace...",
-			"icon": "$(cloud-upload)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem =~ /gitlens:repositories\\b(?=.*?\\b\\+workspaces\\b)/ && gitlens:plus",
-						"group": "inline",
-						"order": 1
-					},
-					{
-						"when": "viewItem =~ /gitlens:repositories\\b(?=.*?\\b\\+workspaces\\b)/ && gitlens:plus",
-						"group": "1_gitlens_actions",
-						"order": 1
-					}
-				]
-			}
-		},
 		"gitlens.views.workspaces.copy": {
 			"label": "Copy",
 			"keybindings": [
@@ -20052,27 +19576,6 @@
 					"mac": "cmd+c"
 				}
 			]
-		},
-		"gitlens.views.workspaces.create": {
-			"label": "Create Cloud Workspace...",
-			"icon": "$(add)",
-			"commandPalette": "gitlens:plus",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem == gitlens:views:workspaces && gitlens:plus",
-						"group": "inline",
-						"order": 1
-					}
-				],
-				"view/title": [
-					{
-						"when": "view == gitlens.views.workspaces && gitlens:plus",
-						"group": "navigation",
-						"order": 1
-					}
-				]
-			}
 		},
 		"gitlens.views.workspaces.createLocal": {
 			"label": "Create VS Code Workspace...",
@@ -20088,57 +19591,6 @@
 						"when": "viewItem =~ /gitlens:workspace\\b(?=.*?\\b\\+(cloud|local)\\b)(?!.*?\\b\\+empty\\b)/ && !listMultiSelection",
 						"group": "2_gitlens_quickopen",
 						"order": 3
-					}
-				]
-			}
-		},
-		"gitlens.views.workspaces.delete": {
-			"label": "Delete Workspace...",
-			"icon": "$(trash)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem =~ /gitlens:workspace\\b(?=.*?\\b\\+cloud\\b)/ && !listMultiSelection",
-						"group": "6_gitlens_actions",
-						"order": 1
-					}
-				]
-			}
-		},
-		"gitlens.views.workspaces.info": {
-			"label": "Learn about Cloud Workspaces...",
-			"icon": "$(info)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem == gitlens:views:workspaces",
-						"group": "8_info",
-						"order": 1
-					}
-				],
-				"view/title": [
-					{
-						"when": "view == gitlens.views.workspaces",
-						"group": "8_info",
-						"order": 1
-					}
-				]
-			}
-		},
-		"gitlens.views.workspaces.locateAllRepos": {
-			"label": "Locate Repositories...",
-			"icon": "$(location)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem =~ /gitlens:workspace\\b(?=.*?\\b\\+cloud\\b)(?!.*?\\b\\+empty\\b)/",
-						"group": "inline",
-						"order": 2
-					},
-					{
-						"when": "viewItem =~ /gitlens:workspace\\b(?=.*?\\b\\+cloud\\b)(?!.*?\\b\\+empty\\b)/ && !listMultiSelection",
-						"group": "1_gitlens_actions",
-						"order": 2
 					}
 				]
 			}
@@ -20207,29 +19659,6 @@
 				]
 			}
 		},
-		"gitlens.views.workspaces.repo.locate": {
-			"label": "Locate Repository...",
-			"icon": "$(location)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem =~ /gitlens:repository\\b(?=.*?\\b\\+workspace\\b)(?!.*?\\b\\+local\\b)/ && !listMultiSelection",
-						"group": "0_2gitlens_actions",
-						"order": 2
-					},
-					{
-						"when": "viewItem =~ /gitlens:workspaceMissingRepository\\b/",
-						"group": "inline",
-						"order": 1
-					},
-					{
-						"when": "viewItem =~ /gitlens:workspaceMissingRepository\\b/ && !listMultiSelection",
-						"group": "1_gitlens_actions",
-						"order": 1
-					}
-				]
-			}
-		},
 		"gitlens.views.workspaces.repo.open": {
 			"label": "Open Repository",
 			"icon": "$(window)",
@@ -20258,24 +19687,6 @@
 						"when": "viewItem =~ /gitlens:repository\\b(?=.*?\\b\\+workspace\\b)/ && !listMultiSelection",
 						"group": "0_1gitlens_actions",
 						"order": 2
-					}
-				]
-			}
-		},
-		"gitlens.views.workspaces.repo.remove": {
-			"label": "Remove from Workspace...",
-			"icon": "$(trash)",
-			"menus": {
-				"view/item/context": [
-					{
-						"when": "viewItem =~ /gitlens:repository\\b(?=.*?\\b\\+workspace\\b)(?!.*?\\b\\+local\\b)/ && !listMultiSelection",
-						"group": "0_3gitlens_actions",
-						"order": 1
-					},
-					{
-						"when": "viewItem =~ /gitlens:workspaceMissingRepository\\b/ && !listMultiSelection",
-						"group": "6_gitlens_actions",
-						"order": 1
 					}
 				]
 			}
@@ -22202,33 +21613,6 @@
 			"container": "scm",
 			"order": 7
 		},
-		"gitlens.views.drafts": {
-			"name": "Cloud Patches",
-			"when": "!gitlens:untrusted && !gitlens:hasVirtualFolders && gitlens:gk:organization:drafts:enabled && config.gitlens.cloudPatches.enabled",
-			"contextualTitle": "GitLens",
-			"icon": "$(gitlens-cloud-patch)",
-			"initialSize": 2,
-			"visibility": "hidden",
-			"container": "gitlens",
-			"order": 3,
-			"welcomeContent": [
-				{
-					"contents": "Cloud Patches ᴘʀᴇᴠɪᴇᴡ — privately and securely share code with specific teammates and other developers, accessible from anywhere. Enhance collaboration without adding noise to your repositories."
-				},
-				{
-					"contents": "[Create Cloud Patch](command:gitlens.views.drafts.create)",
-					"when": "gitlens:plus"
-				},
-				{
-					"contents": "[Try GitLens Pro](command:gitlens.plus.signUp?%7B%22source%22%3A%22cloud-patches%22%7D)\n\nGet 14 days of GitLens Pro for free — no credit card required. Or [sign in](command:gitlens.plus.login?%7B%22source%22%3A%22cloud-patches%22%7D).",
-					"when": "!gitlens:plus"
-				},
-				{
-					"contents": "An account is required and may require [GitLens Pro](https://help.gitkraken.com/gitlens/gitlens-community-vs-gitlens-pro/) in the future.",
-					"when": "gitlens:plus:state != 6"
-				}
-			]
-		},
 		"gitlens.views.fileHistory": {
 			"name": "File History",
 			"when": "!gitlens:disabled && !(config.gitlens.views.scm.grouped.views.fileHistory || gitlens:views:scm:grouped:views:fileHistory)",
@@ -22311,16 +21695,6 @@
 			"visibility": "collapsed",
 			"container": "gitlensInspect",
 			"order": 2
-		},
-		"gitlens.views.patchDetails": {
-			"type": "webview",
-			"name": "Patch",
-			"when": "!gitlens:untrusted && config.gitlens.cloudPatches.enabled && gitlens:views:patchDetails:mode",
-			"contextualTitle": "GitLens",
-			"icon": "$(gitlens-cloud-patch)",
-			"initialSize": 24,
-			"container": "gitlensPatch",
-			"order": 0
 		},
 		"gitlens.views.pullRequest": {
 			"name": "Pull Request",
@@ -22538,31 +21912,14 @@
 			"order": 1
 		},
 		"gitlens.views.workspaces": {
-			"name": "Cloud Workspaces",
+			"name": "Workspaces",
 			"when": "!gitlens:untrusted && !gitlens:hasVirtualFolders",
 			"contextualTitle": "GitLens",
 			"icon": "$(gitlens-workspaces-view)",
 			"initialSize": 2,
 			"visibility": "hidden",
 			"container": "gitlens",
-			"order": 4,
-			"welcomeContent": [
-				{
-					"contents": "Workspaces ᴘʀᴇᴠɪᴇᴡ — group and manage multiple repositories together, accessible from anywhere, streamlining your workflow.\n\nCreate workspaces just for yourself or share (coming soon in GitLens) them with your team for faster onboarding and better collaboration."
-				},
-				{
-					"contents": "[Create Cloud Workspace](command:gitlens.views.workspaces.create)",
-					"when": "gitlens:plus"
-				},
-				{
-					"contents": "[Try GitLens Pro](command:gitlens.plus.signUp?%7B%22source%22%3A%22workspaces%22%7D)\n\nGet 14 days of GitLens Pro for free — no credit card required. Or [sign in](command:gitlens.plus.login?%7B%22source%22%3A%22workspaces%22%7D).",
-					"when": "!gitlens:plus"
-				},
-				{
-					"contents": "An account is required and may require [GitLens Pro](https://help.gitkraken.com/gitlens/gitlens-community-vs-gitlens-pro/) in the future.",
-					"when": "gitlens:plus:state != 6"
-				}
-			]
+			"order": 3
 		},
 		"gitlens.views.worktrees": {
 			"name": "Worktrees",

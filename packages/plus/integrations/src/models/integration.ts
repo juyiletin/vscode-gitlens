@@ -287,9 +287,11 @@ type BatchTarget = { owner: string; repo: string; project?: string } | { resourc
  */
 function batchTargetScope(providerId: IntegrationIds, target: BatchTarget): CollectionScope {
 	if ('resourceId' in target) return { providerId: providerId, resourceId: target.resourceId };
+
 	if (isAzureProviderId(providerId)) {
 		return { providerId: providerId, resourceId: target.owner, projectId: target.project };
 	}
+
 	return { providerId: providerId, repositoryId: `${target.owner}/${target.repo}` };
 }
 
@@ -407,6 +409,7 @@ export abstract class IntegrationBase<
 		if (this._sessionFingerprint?.session !== this._session) {
 			this._sessionFingerprint = { session: this._session, hash: this.getSessionFingerprint(this._session) };
 		}
+
 		return this._sessionFingerprint.hash;
 	}
 
@@ -416,6 +419,7 @@ export abstract class IntegrationBase<
 
 	get connectionExpired(): boolean | undefined {
 		if (this._session?.expiresAt == null) return undefined;
+
 		return new Date(this._session.expiresAt) < new Date();
 	}
 
@@ -449,7 +453,9 @@ export abstract class IntegrationBase<
 		if (this._session === undefined) {
 			return this.ensureSession({ createIfNeeded: false, source: source });
 		}
+
 		if (this._session == null || !this.isSessionForIntegrationHost(this._session)) return undefined;
+
 		if (this.connectionExpired) return this.getRefreshedSession();
 
 		return this._session;
@@ -513,7 +519,7 @@ export abstract class IntegrationBase<
 			try {
 				const authProvider = await this.authenticationService.get(this.authProvider.id);
 				const session = await authProvider.getSession(
-					{ ...this.authProviderDescriptor, connectionId: connectionId, cloud: true },
+					{ ...this.authProviderDescriptor, connectionId: connectionId },
 					{ source: source, refreshRejectedToken: refreshRejectedToken },
 				);
 				return session != null && this.isSessionForIntegrationHost(session) ? session : undefined;
@@ -677,6 +683,7 @@ export abstract class IntegrationBase<
 			if (this._session != null && this._session.accessToken !== accessToken) {
 				this._session = undefined;
 			}
+
 			await this.resolveSessionLocked({ createIfNeeded: false });
 		});
 	}
@@ -754,6 +761,7 @@ export abstract class IntegrationBase<
 		if (affectsPrimary && getSessionIdentity(this._session) !== getSessionIdentity(session)) {
 			this._session = undefined;
 		}
+
 		this.invalidatePublishedSession(publication, affectsPrimary);
 	}
 
@@ -774,6 +782,7 @@ export abstract class IntegrationBase<
 	 */
 	private getSecondaryConnectionId(connectionId: string | undefined): string | undefined {
 		if (!connectionId || connectionId === this._session?.id) return undefined;
+
 		if (
 			connectionId ===
 			this.authenticationService.getPrimaryConnectionId(this.authProvider.id, this.authProviderDescriptor)
@@ -887,6 +896,7 @@ export abstract class IntegrationBase<
 				});
 				this.skippedNonCloudReported = true;
 			}
+
 			return undefined;
 		}
 
@@ -960,6 +970,7 @@ export abstract class IntegrationBase<
 				await this.disconnectLocked({ silent: true }, true);
 				break;
 		}
+
 		this._resyncs++;
 		this._lastResyncFailure = failure;
 		return failure;
@@ -1036,6 +1047,7 @@ export abstract class IntegrationBase<
 		// Published for the connection, as a refusal outside any scope would be, while the scopes that answered keep
 		// their results. That already asks for a reconnect, so there is nothing left for a probe to settle.
 		if (this.markCredentialRefusals(metadata)) return;
+
 		if ((await this.confirmCredential(session)) !== 'confirmed') return;
 
 		this.nameRefusalCauses(session, metadata);
@@ -1076,6 +1088,7 @@ export abstract class IntegrationBase<
 			if (!keepOtherFailures) {
 				throwIfAllSettledFailed(slots);
 			}
+
 			return slots;
 		}
 
@@ -1131,6 +1144,7 @@ export abstract class IntegrationBase<
 		if (strike) {
 			this.trackRequestException({ connectionId: connectionId });
 		}
+
 		notify();
 	}
 
@@ -1150,6 +1164,7 @@ export abstract class IntegrationBase<
 			this.handleProviderException(syncReqUsecase, ex, options);
 			return;
 		}
+
 		if (isCancellationError(ex)) return;
 
 		if (options.scope != null) {
@@ -1187,6 +1202,7 @@ export abstract class IntegrationBase<
 
 			return 'unproven';
 		}
+
 		return 'confirmed';
 	}
 
@@ -1303,6 +1319,7 @@ export abstract class IntegrationBase<
 			});
 			this.missingExpirityReported = true;
 		}
+
 		return undefined;
 	}
 
@@ -1324,6 +1341,7 @@ export abstract class IntegrationBase<
 					`${this.name} connection '${secondary}' has failed ${count} requests since its last success; it is not the primary, so nothing is disconnected`,
 				);
 			}
+
 			return;
 		}
 
@@ -1333,6 +1351,7 @@ export abstract class IntegrationBase<
 			if (!options?.silent) {
 				this.ctx.hooks?.ui?.onDisconnectedAfterTooManyFailures?.(this.name);
 			}
+
 			void this.disconnect({ currentSessionOnly: true });
 		}
 	}
@@ -1415,6 +1434,7 @@ export abstract class IntegrationBase<
 
 			this._session = null;
 		}
+
 		if (this.ctx.config.isIntegrationsEnabled?.() === false) return undefined;
 
 		const generation = this.discoveryGeneration;
@@ -1423,6 +1443,7 @@ export abstract class IntegrationBase<
 			await this.ctx.storage.deleteWorkspace(this.connectedKey);
 			if (this.getSessionDiscoveryGeneration(this._session?.id, undefined, this._session?.cloud) > generation) {
 				if (sync) throw new CancellationError();
+
 				return undefined;
 			}
 		} else if (this.ctx.storage.getWorkspace(this.connectedKey) === false) {
@@ -1442,12 +1463,14 @@ export abstract class IntegrationBase<
 			if (session?.expiresAt != null && session.expiresAt < new Date()) {
 				session = null;
 			}
+
 			if (session != null && !this.isSessionForIntegrationHost(session)) {
 				session = undefined;
 			}
 		} catch (ex) {
 			if (isCancellationError(ex) || !this.isResolvedSessionCurrent(undefined, generation)) {
 				if (sync) throw new CancellationError();
+
 				return undefined;
 			}
 
@@ -1455,6 +1478,7 @@ export abstract class IntegrationBase<
 
 			if (!this.isResolvedSessionCurrent(undefined, generation)) {
 				if (sync) throw new CancellationError();
+
 				return undefined;
 			}
 
@@ -1476,6 +1500,7 @@ export abstract class IntegrationBase<
 
 		if (!this.isResolvedSessionCurrent(session ?? undefined, generation)) {
 			if (sync) throw new CancellationError();
+
 			return undefined;
 		}
 
@@ -1490,6 +1515,7 @@ export abstract class IntegrationBase<
 		} else if (refetch && session != null) {
 			this.onSessionPublishing({ session: session, replacePrimary: true });
 		}
+
 		this._session = session ?? null;
 		this.smoothifyRequestExceptionCount();
 
@@ -1501,6 +1527,7 @@ export abstract class IntegrationBase<
 				publishedGeneration !== this.getSessionDiscoveryGeneration(session.id, undefined, session.cloud)
 			) {
 				if (sync) throw new CancellationError();
+
 				return undefined;
 			}
 
@@ -1613,6 +1640,7 @@ export abstract class IntegrationBase<
 		// account-wide read is user-scoped (GitHub/GitLab/Azure) overrides this and honors `includeAllAssignees`.
 		const values = await this.searchProviderMyIssues(session, resources, cancellation);
 		if (values == null) return undefined;
+
 		return { values: values, truncated: false };
 	}
 
@@ -1743,6 +1771,7 @@ export abstract class IntegrationBase<
 								connectionId: connectionId,
 							});
 						}
+
 						throw ex;
 					}
 				},
@@ -1854,8 +1883,10 @@ export abstract class IntegrationBase<
 
 		const refreshFailure = await this.prepareSessionLookup();
 		if (refreshFailure === 'unconnected') return undefined;
+
 		if (refreshFailure != null) {
 			if (options?.throwOnError) throw refreshFailure;
+
 			return undefined;
 		}
 

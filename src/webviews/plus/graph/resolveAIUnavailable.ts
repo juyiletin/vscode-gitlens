@@ -1,5 +1,4 @@
 import { l10n } from 'vscode';
-import { gitKrakenProviderDescriptor } from '@gitlens/ai/constants.js';
 import { AIError, AIErrorReason, isAIUnavailableError } from '@gitlens/ai/errors.js';
 import { formatPlural } from '@gitlens/utils/plural.js';
 import { getPresentableErrorMessage } from '../../../errors.js';
@@ -10,21 +9,16 @@ export function findAIUnavailableError(errors: readonly { error: Error }[]): Err
 	return errors.find(e => isAIUnavailableError(e.error))?.error;
 }
 
-/** Whether AI is unavailable because the weekly usage included in the user's GitKraken plan ran out. An
- *  external provider's own quota (e.g. Copilot's) isn't something GitKraken credits can fix. */
+/** Whether the selected AI provider reported that its usage quota was exceeded. */
 export function isAIQuotaExceededError(ex: unknown): boolean {
-	return (
-		ex instanceof AIError &&
-		ex.reason === AIErrorReason.UserQuotaExceeded &&
-		(ex.provider == null || ex.provider.id === gitKrakenProviderDescriptor.id)
-	);
+	return ex instanceof AIError && ex.reason === AIErrorReason.UserQuotaExceeded;
 }
 
 /** How a resolve run's errors reach the panel: a single run-level `error` when AI was unavailable and
  *  resolved nothing, otherwise the per-file `errors` — plus one `aiUnavailable` notice, replacing the
  *  message on every file AI being unavailable left unresolved. */
 export type ResolveRunErrors =
-	| { error: { message: string; action?: ResolveAIUnavailable['action'] } }
+	| { error: { message: string } }
 	| { errors: { filePath: string; message?: string }[]; aiUnavailable?: ResolveAIUnavailable };
 
 /**
@@ -34,19 +28,17 @@ export type ResolveRunErrors =
  *
  * @param resolutions The run's resolutions. Automatic both-deleted resolutions aren't AI work, so they
  * don't count as something AI resolved.
- * @param canPurchaseCredits Whether this user may buy more AI credits. Only read for a quota failure.
  */
 export function classifyResolveRunErrors(
 	resolutions: readonly { descriptionKind?: string }[],
 	errors: readonly { filePath: string; error: Error }[],
-	canPurchaseCredits: boolean,
 ): ResolveRunErrors {
 	const unavailable = findAIUnavailableError(errors);
 	if (unavailable == null) {
 		return { errors: errors.map(e => ({ filePath: e.filePath, message: getPresentableErrorMessage(e.error) })) };
 	}
 
-	const notice = getAIUnavailableNotice(unavailable, canPurchaseCredits);
+	const notice = getAIUnavailableNotice(unavailable);
 
 	if (!resolutions.some(r => r.descriptionKind !== 'automatic-both-deleted')) {
 		return {
@@ -57,7 +49,6 @@ export function classifyResolveRunErrors(
 					),
 					{ count: errors.length, reason: notice.message },
 				),
-				action: notice.action,
 			},
 		};
 	}
@@ -74,23 +65,6 @@ export function classifyResolveRunErrors(
 	};
 }
 
-function getAIUnavailableNotice(error: Error, canPurchaseCredits: boolean): ResolveAIUnavailable {
-	// The quota error's own text only states the reason; add what the user can do about it, as the
-	// service's quota notification does.
-	if (isAIQuotaExceededError(error)) {
-		return canPurchaseCredits
-			? {
-					message: l10n.t(
-						'You’ve reached the weekly AI usage included in your plan. Purchase more AI credits to keep using GitKraken AI.',
-					),
-					action: 'purchase-credits',
-				}
-			: {
-					message: l10n.t(
-						'You’ve reached the weekly AI usage included in your plan. Contact your organization admin or owner to request more AI credits.',
-					),
-				};
-	}
-
+function getAIUnavailableNotice(error: Error): ResolveAIUnavailable {
 	return { message: getPresentableErrorMessage(error) };
 }

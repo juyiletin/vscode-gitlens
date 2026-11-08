@@ -12,7 +12,7 @@ import * as esbuild from 'esbuild';
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const outfile = join(root, 'dist', 'consumer.test.mjs');
 
-await esbuild.build({
+const result = await esbuild.build({
 	absWorkingDir: root,
 	entryPoints: ['src/consumer.test.ts'],
 	outfile: outfile,
@@ -25,5 +25,9 @@ await esbuild.build({
 	banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
 	logLevel: 'warning',
 });
+
+if (result.warnings.length !== 0) {
+	throw new Error('The consumer bundle must build without warnings');
+}
 
 execFileSync(process.execPath, [outfile], { stdio: 'inherit', cwd: root });

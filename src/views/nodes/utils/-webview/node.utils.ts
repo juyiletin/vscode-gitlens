@@ -2,7 +2,6 @@ import { l10n } from 'vscode';
 import type { GitCommit } from '@gitlens/git/models/commit.js';
 import type { TreeViewNodeTypes } from '../../../../constants.views.js';
 import { treeViewFileNodeTypes, treeViewRefFileNodeTypes, treeViewRefNodeTypes } from '../../../../constants.views.js';
-import type { DraftsViewNode } from '../../../draftsView.js';
 import type { LaunchpadItemNode, LaunchpadViewNode } from '../../../launchpadView.js';
 import type { SearchAndCompareViewNode } from '../../../searchAndCompareView.js';
 import type { WorkspacesViewNode } from '../../../workspacesView.js';
@@ -15,7 +14,6 @@ import type { BranchNode, CommitsCurrentBranchNode } from '../../branchNode.js';
 import type { BranchOrTagFolderNode } from '../../branchOrTagFolderNode.js';
 import type { BranchTrackingStatusFilesNode } from '../../branchTrackingStatusFilesNode.js';
 import type { BranchTrackingStatusNode } from '../../branchTrackingStatusNode.js';
-import type { CodeSuggestionsNode } from '../../codeSuggestionsNode.js';
 import type { CommitFileNode } from '../../commitFileNode.js';
 import type { CommitNode } from '../../commitNode.js';
 import type { PagerNode } from '../../common.js';
@@ -24,7 +22,6 @@ import type { CompareBranchNode } from '../../compareBranchNode.js';
 import type { CompareResultsNode } from '../../compareResultsNode.js';
 import type { ContributorNode } from '../../contributorNode.js';
 import type { ContributorsNode } from '../../contributorsNode.js';
-import type { DraftNode } from '../../draftNode.js';
 import type { FileHistoryNode } from '../../fileHistoryNode.js';
 import type { FileHistoryTrackerNode } from '../../fileHistoryTrackerNode.js';
 import type { FileRevisionAsCommitNode } from '../../fileRevisionAsCommitNode.js';
@@ -95,12 +92,6 @@ export type TreeViewNodesByType = {
 		? ContributorNode
 		: T extends 'contributors'
 		? ContributorsNode
-		: T extends 'draft'
-		? DraftNode
-		: T extends 'drafts'
-		? DraftsViewNode
-		: T extends 'drafts-code-suggestions'
-		? CodeSuggestionsNode
 		: T extends 'file-commit'
 		? FileRevisionAsCommitNode
 		: T extends 'file-history'
@@ -272,9 +263,11 @@ export function isViewNode<T extends keyof TreeViewNodesByType>(node: unknown, t
 	if (node == null || !(node instanceof ViewNode)) return false;
 
 	if (type == null) return true;
+
 	if (Array.isArray(type)) {
 		return type.includes(node.type);
 	}
+
 	return node.type === type;
 }
 

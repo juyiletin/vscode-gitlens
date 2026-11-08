@@ -391,3 +391,13 @@ export function getCommunitySubscription(subscription?: Subscription): Subscript
 		state: SubscriptionState.Community,
 	};
 }
+
+/** The fork's local Pro entitlement. It deliberately carries no account or expiry. */
+export function getLocalSubscription(): Subscription {
+	const plan = getSubscriptionPlan('pro', false, 0, undefined);
+	return {
+		plan: { actual: plan, effective: plan },
+		account: undefined,
+		state: SubscriptionState.Paid,
+	};
+}

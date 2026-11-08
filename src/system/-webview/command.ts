@@ -11,13 +11,13 @@ import type {
 	GlWebviewCommands,
 } from '../../constants.commands.js';
 import { actionCommandPrefix } from '../../constants.commands.js';
-import { Container } from '../../container.js';
-import { isWebviewContext } from '../webview.js';
+import type { Container } from '../../container.js';
 
 export type CommandCallback = Parameters<typeof commands.registerCommand>[1];
 
 type CommandConstructor = new (container: Container, ...args: any[]) => GlCommandBase;
 const registrableCommands: CommandConstructor[] = [];
+let commandUsage: Container['usage'] | undefined;
 
 export function command(): ClassDecorator {
 	return (target: any) => {
@@ -34,40 +34,7 @@ export function registerCommand(
 	return commands.registerCommand(
 		command,
 		function (this: any, ...args) {
-			let context: any;
-			if (command === 'gitlens.gitCommands') {
-				const arg = args?.[0];
-				if (arg?.command != null) {
-					context = { mode: args[0].command };
-					if (arg?.state?.subcommand != null) {
-						context.submode = arg.state.subcommand;
-					}
-				}
-			}
-
-			Container.instance.telemetry.sendEvent(
-				'command',
-				{
-					command: command,
-					'context.mode': context?.mode,
-					'context.submode': context?.submode,
-				},
-				args[0]?.source,
-			);
-
-			if (command.startsWith('gitlens.graph.')) {
-				Container.instance.telemetry.sendEvent(
-					'graph/command',
-					{
-						command: command,
-						'context.mode': context?.mode,
-						'context.submode': context?.submode,
-					},
-					args[0]?.source,
-				);
-			}
-
-			void Container.instance.usage.track(`command:${command}:executed`).catch();
+			void commandUsage?.track(`command:${command}:executed`).catch();
 			if (options?.returnResult) {
 				// oxlint-disable-next-line typescript/no-unsafe-return
 				return callback.call(this, ...args);
@@ -88,26 +55,7 @@ export function registerWebviewCommand(
 	return commands.registerCommand(
 		command,
 		function (this: any, ...args) {
-			const webview = isWebviewContext(args[0]) ? args[0].webview : undefined;
-
-			Container.instance.telemetry.sendEvent('command', {
-				command: command,
-				webview: webview ?? '<missing>',
-			});
-
-			if (
-				webview === 'gitlens.graph' ||
-				webview === 'gitlens.views.graph' ||
-				command.startsWith('gitlens.graph.') ||
-				command.endsWith(':graph')
-			) {
-				Container.instance.telemetry.sendEvent('graph/command', {
-					command: command,
-					webview: webview ?? '<missing>',
-				});
-			}
-
-			void Container.instance.usage.track(`command:${command}:executed`).catch();
+			void commandUsage?.track(`command:${command}:executed`).catch();
 			if (options?.returnResult) {
 				// oxlint-disable-next-line typescript/no-unsafe-return
 				return callback.call(this, ...args);
@@ -120,6 +68,7 @@ export function registerWebviewCommand(
 }
 
 export function registerCommands(container: Container): Disposable[] {
+	commandUsage = container.usage;
 	return registrableCommands.map(c => new c(container));
 }
 
@@ -166,15 +115,6 @@ export function executeCoreCommand<T extends [...unknown[]] = [], U = any>(
 	command: CoreCommands,
 	...args: T
 ): Thenable<U> {
-	if (
-		command !== 'setContext' &&
-		command !== 'vscode.executeDocumentSymbolProvider' &&
-		command !== 'vscode.changes' &&
-		command !== 'vscode.diff' &&
-		command !== 'vscode.open'
-	) {
-		Container.instance.telemetry.sendEvent('command/core', { command: command });
-	}
 	return commands.executeCommand<U>(command, ...args);
 }
 
@@ -200,7 +140,6 @@ export function executeCoreGitCommand<T extends [...unknown[]] = [], U = any>(
 	command: CoreGitCommands,
 	...args: T
 ): Thenable<U> {
-	Container.instance.telemetry.sendEvent('command/core', { command: command });
 	return commands.executeCommand<U>(command, ...args);
 }
 

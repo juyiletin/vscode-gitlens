@@ -59,8 +59,6 @@ export type GraphWebviewShowingArgs = [
 	| { repository: GlRepository; compare: GraphCompareSeed; source?: Source }
 	| { sidebarPanel: GraphSidebarPanel; source?: Source }
 	| { visualization: VisualizationMode; repository?: GlRepository; source?: Source }
-	/** Opens the Send Feedback dialog on the already-open graph (the panel's title-toolbar command). */
-	| { feedback: true; source?: Source }
 	| {
 			action: GraphShowAction;
 			target?: GraphActionTarget;
@@ -384,11 +382,13 @@ export function registerGraphWebviewCommands<T>(
 						showInGraphArg = { repository: repo };
 					}
 				}
+
 				args = [];
 			} else if (arg instanceof ViewNode) {
 				if (arg.is('repo-folder')) {
 					showInGraphArg = { repository: arg.repo };
 				}
+
 				args = [];
 			}
 
@@ -442,10 +442,6 @@ export function registerGraphWebviewCommands<T>(
 			void container.views.graph.show({ preserveFocus: preserveFocus, source: source }, args);
 		}),
 		registerCommand(`${panels.id}.refresh`, () => void panels.getActiveInstance()?.refresh(true)),
-		registerCommand(
-			`${panels.id}.sendFeedback`,
-			() => void panels.getActiveInstance()?.show(undefined, { feedback: true }),
-		),
 		registerCommand(
 			`${panels.id}.split`,
 			() => void panels.splitActiveInstance({ preserveInstance: false, column: ViewColumn.Beside }),

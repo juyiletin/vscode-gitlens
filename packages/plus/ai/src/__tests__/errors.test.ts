@@ -53,15 +53,6 @@ suite('AIError diagnostics', () => {
 		assert.strictEqual(error.diagnosticString, 'Error: You have exceeded your user token limit');
 	});
 
-	test('keeps the weekly plan message for an explicit GitKraken provider', () => {
-		const error = new AIError(AIErrorReason.UserQuotaExceeded, undefined, {
-			id: 'gitkraken',
-			name: 'GitKraken AI',
-		});
-
-		assert.strictEqual(error.message, 'You’ve reached the weekly AI usage included in your plan.');
-	});
-
 	test('names the provider in the model-unavailable message when one is given', () => {
 		const withProvider = new AIError(AIErrorReason.ModelUnavailable, undefined, { id: 'vscode', name: 'Copilot' });
 		const without = new AIError(AIErrorReason.ModelUnavailable);
@@ -145,6 +136,7 @@ suite('classifyNetworkError', () => {
 		for (let i = 0; i < 5; i++) {
 			current = withCause('wrap', current);
 		}
+
 		assert.strictEqual(classifyNetworkError(current), undefined);
 	});
 
@@ -154,6 +146,7 @@ suite('classifyNetworkError', () => {
 		for (let i = 0; i < 4; i++) {
 			current = withCause('wrap', current);
 		}
+
 		assert.strictEqual(classifyNetworkError(current), AIErrorReason.NoNetwork);
 	});
 

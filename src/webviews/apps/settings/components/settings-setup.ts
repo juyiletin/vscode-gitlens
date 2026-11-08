@@ -572,29 +572,16 @@ export class GlSettingsSetup extends SignalWatcher(LitElement) {
 			actionVariant: done ? 'quiet' : 'primary',
 		};
 	}
-
 	private agentsStep(): SetupStep {
-		const ai = this._state.aiState.get();
-		const mcp = ai?.mcp;
-		const mcpActive = mcp?.settingEnabled === true && mcp?.installed === true;
-		// Hooks only count when at least one hook-supporting agent is present; otherwise there's nothing to install
-		const hookAgents = ai?.hooks.agents ?? [];
-		const hooksApplicable = hookAgents.length > 0;
-		const hooksDone = !hooksApplicable || hookAgents.every(a => a.installed);
-		const done = mcpActive && hooksDone;
-
-		const installedCount = hookAgents.filter(a => a.installed).length;
-		const status = this.agentsStatus(mcpActive, hooksApplicable, installedCount, hookAgents.length);
-
+		const done =
+			this._state.agents.get()?.some(agent => agent.detected !== false && agent.kind !== 'editor') ?? false;
 		return {
 			key: 'agents',
 			icon: 'robot',
-			title: l10n.t('Give agents Git context, and watch them work'),
-			why: l10n.t(
-				'MCP gives agents your history, branches, PRs, and issue context; hooks report their sessions back, so you can view and manage agents directly in the Graph.',
-			),
+			title: l10n.t('Agents'),
+			why: l10n.t('Choose a default coding agent and connect installed agents.'),
 			state: done ? 'done' : 'todo',
-			status: status,
+			status: done ? l10n.t('Agents are available.') : l10n.t('Not detected'),
 			action: done ? l10n.t('Manage Agents') : l10n.t('Set up'),
 			actionVariant: done ? 'quiet' : 'primary',
 			nav: 'agents',
@@ -698,28 +685,12 @@ export class GlSettingsSetup extends SignalWatcher(LitElement) {
 		}
 	}
 
-	private agentsStatus(
-		mcpActive: boolean,
-		hooksApplicable: boolean,
-		installedCount: number,
-		allCount: number,
-	): string {
-		if (!hooksApplicable) {
-			return mcpActive ? l10n.t('MCP connected') : l10n.t('MCP and hooks not set up');
-		}
-
-		if (mcpActive) {
-			return l10n.t('MCP connected · Hooks installed for {0} of {1} agents', installedCount, allCount);
-		}
-
-		return l10n.t('MCP not connected · Hooks installed for {0} of {1} agents', installedCount, allCount);
-	}
-
 	/** Label of the first not-yet-done step, in the walkthrough's own step order. */
 	private nextStepLabel(state: Record<string, boolean>, labels: Record<string, string>): string | undefined {
 		for (const [key, done] of Object.entries(state)) {
 			if (!done) return labels[key];
 		}
+
 		return undefined;
 	}
 
@@ -732,6 +703,7 @@ export class GlSettingsSetup extends SignalWatcher(LitElement) {
 				),
 			};
 		}
+
 		if (done >= total) {
 			return {
 				title: l10n.t("You're all set"),

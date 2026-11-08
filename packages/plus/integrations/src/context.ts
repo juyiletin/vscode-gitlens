@@ -9,6 +9,7 @@ import type { ResourceDescriptor } from '@gitlens/git/models/resourceDescriptor.
 import type { Event } from '@gitlens/utils/event.js';
 import type { CacheController } from '@gitlens/utils/promiseCache.js';
 import type { IntegrationAuthenticationProvider } from './authentication/integrationAuthenticationProvider.js';
+import type { CloudIntegrationConnection } from './authentication/models.js';
 import type { IntegrationIds } from './constants.js';
 import type { GitHostIntegration } from './models/gitHostIntegration.js';
 import type { IntegrationBase } from './models/integration.js';
@@ -65,11 +66,7 @@ export interface AccountProvider {
 	 * whether a connected integration's rich features are usable.
 	 */
 	isTrialOrPaid(): Promise<boolean>;
-	/**
-	 * Authenticated request against the GK cloud API (the connections/tokens endpoints used by
-	 * `CloudIntegrationService`). Routes through the host's shared `ServerConnection` (circuit-breaker).
-	 */
-	fetchGkApi(path: string, init?: RequestInit): Promise<Response>;
+
 	/**
 	 * Run the GK-Dev connect flow for the given integrations: the host builds the connect URL (query,
 	 * provider, exchange-token vs redirect), opens it, awaits its own OAuth callback, and signs in +
@@ -304,6 +301,10 @@ export interface ConfigChangeEvent {
  * preserve existing analytics.
  */
 export interface IntegrationServiceHooks {
+	/** Optional inventory owned by a consumer's credential provider. No vendor cloud is contacted by the package. */
+	getConnections?(): Promise<readonly CloudIntegrationConnection[] | undefined>;
+	/** Credential directories may announce additions, removals, or forced refreshes. */
+	readonly onDidChangeConnections?: Event<{ force?: boolean }>;
 	/**
 	 * Ask the host to confirm reauthentication after an integration auth/permission failure. The host
 	 * owns the prompt (and its "Reauthenticate" affordance) and resolves to the user's choice; the
@@ -328,6 +329,8 @@ export interface IntegrationServiceHooks {
 	 * external consumer can plug in any auth strategy here.
 	 */
 	createAuthenticationProvider?(args: { id: IntegrationIds }): Promise<IntegrationAuthenticationProvider | undefined>;
+	/** Ask for the endpoint of a new self-managed provider connection. */
+	requestIntegrationDomain?(id: IntegrationIds): Promise<string | undefined>;
 
 	/**
 	 * Outbound behavioral events, nested by domain — mirroring `@gitlens/git`'s `GitServiceHooks`. The

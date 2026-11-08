@@ -1,3 +1,4 @@
+import type { AuthenticationSessionAccountInformation } from 'vscode';
 import { authentication, extensions } from 'vscode';
 import { wrapForForcedInsecureSSL } from '@env/fetch.js';
 import type { IntegrationAuthenticationSessionDescriptor } from '@gitlens/integrations/authentication/integrationAuthenticationProvider.js';
@@ -14,10 +15,11 @@ export const getBuiltInIntegrationSession = sequentialize(
 		container: Container,
 		id: IntegrationIds,
 		descriptor: IntegrationAuthenticationSessionDescriptor,
-		options?:
+		options?: (
 			| { createIfNeeded: true; silent?: never; forceNewSession?: never }
 			| { createIfNeeded?: never; silent: true; forceNewSession?: never }
-			| { createIfNeeded?: never; silent?: never; forceNewSession: true },
+			| { createIfNeeded?: never; silent?: never; forceNewSession: true }
+		) & { account?: AuthenticationSessionAccountInformation },
 	): Promise<ProviderAuthenticationSession | undefined> =>
 		wrapForForcedInsecureSSL(
 			container.integrations.ignoreSSLErrors({ id: id, domain: descriptor.domain }),
@@ -35,11 +37,24 @@ export const getBuiltInIntegrationSession = sequentialize(
 					}
 				}
 
+				if (
+					id !== 'github' &&
+					!extensions.all.some(extension => {
+						const providers = extension.packageJSON?.contributes?.authentication as
+							| { id: string }[]
+							| undefined;
+						return providers?.some(provider => provider.id === id);
+					})
+				) {
+					return undefined;
+				}
+
 				try {
 					const session = await authentication.getSession(id, descriptor.scopes, {
 						createIfNone: options?.createIfNeeded,
 						silent: options?.silent,
 						forceNewSession: options?.forceNewSession,
+						account: options?.account,
 					});
 					if (session == null) return undefined;
 

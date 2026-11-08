@@ -135,6 +135,7 @@ export function getSuggestedActions(
 	} else {
 		actions.push('open-worktree', 'switch', 'open-in-graph');
 	}
+
 	return actions;
 }
 
@@ -221,6 +222,7 @@ function createCachedPromise<T>(promise: Promise<T | undefined>, cancellable: bo
 					result.value as readonly Pick<PullRequest, 'state' | 'mergeQueue'>[],
 				);
 			}
+
 			settled(result?.error != null && !hasValue ? 'failed' : 'ok');
 		},
 		(ex: unknown) => settled(isCancellationError(ex) ? 'cancelled' : 'failed'),
@@ -333,6 +335,7 @@ function getEnrichedItemsForHost(
 			own[uuid] = matching;
 		}
 	}
+
 	return own;
 }
 
@@ -507,6 +510,7 @@ export class LaunchpadProvider implements Disposable {
 					return { value: [pr.value], duration: pr.duration };
 				}
 			}
+
 			return undefined;
 		};
 
@@ -521,6 +525,7 @@ export class LaunchpadProvider implements Disposable {
 			if (prs != null) {
 				return { value: prs.value, duration: prs.duration };
 			}
+
 			return undefined;
 		};
 
@@ -776,10 +781,6 @@ export class LaunchpadProvider implements Disposable {
 		await this.container.deepLinks.processDeepLinkUri(deepLinkUrl, false);
 	}
 
-	generateWebUrl(): Promise<string> {
-		return this.container.urls.getGkDevUrl('launchpad');
-	}
-
 	private getItemBranchDeepLink(item: LaunchpadItem, action?: DeepLinkActionType): Uri | undefined {
 		if (item.type !== 'pullrequest' || item.headRef == null || item.repoIdentity?.remote?.url == null) {
 			return undefined;
@@ -885,6 +886,7 @@ export class LaunchpadProvider implements Disposable {
 			const prIdentity = integration.getPullRequestIdentityFromMaybeUrl(search);
 			if (prIdentity) return prIdentity;
 		}
+
 		return getPullRequestIdentityFromMaybeUrl(search);
 	}
 
@@ -952,6 +954,7 @@ export class LaunchpadProvider implements Disposable {
 				if (prs?.error != null) {
 					scope?.error(prs.error, 'Failed to get pull requests');
 				}
+
 				result = {
 					items: [],
 					timings: { prs: prs?.duration, enrichedItems: enrichedItems?.duration },

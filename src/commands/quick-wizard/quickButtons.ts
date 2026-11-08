@@ -10,10 +10,12 @@ import { supportedInVSCodeVersion } from '../../system/-webview/vscode.js';
  */
 export function flipToggle(button: QuickInputButton): boolean {
 	if (button.toggle != null) return button.toggle.checked;
+
 	if (button instanceof ToggleQuickInputButton) {
 		button.on = !button.on;
 		return button.on;
 	}
+
 	return false;
 }
 
@@ -27,6 +29,7 @@ export function getQuickInputButtonLocation(location: QuickInputButtonLocation):
  */
 export function isToggleChecked(button: QuickInputButton): boolean {
 	if (button.toggle != null) return button.toggle.checked;
+
 	return button instanceof ToggleQuickInputButton ? button.on : false;
 }
 
@@ -53,6 +56,7 @@ export function createToggleButton(options: {
 			toggle: { checked: options.checked },
 		};
 	}
+
 	return options.legacy();
 }
 
@@ -263,11 +267,6 @@ export const OpenOnAzureDevOpsQuickInputButton: QuickInputButton = {
 export const OpenOnBitbucketQuickInputButton: QuickInputButton = {
 	iconPath: new ThemeIcon('globe'),
 	tooltip: l10n.t('Open on Bitbucket'),
-};
-
-export const OpenOnWebQuickInputButton: QuickInputButton = {
-	iconPath: new ThemeIcon('globe'),
-	tooltip: l10n.t('Open on gitkraken.dev'),
 };
 
 export const LaunchpadSettingsQuickInputButton: QuickInputButton = {

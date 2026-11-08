@@ -1,7 +1,6 @@
-import { existsSync } from 'node:fs';
-import { RunError } from '@gitlens/utils/env/node/exec.js';
-import { Logger } from '@gitlens/utils/logger.js';
-import { runCLICommand } from './cli/utils.js';
+import { accessSync, constants, existsSync, statSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
+import * as process from 'node:process';
 
 export type GkAgent = {
 	readonly name: string;
@@ -14,65 +13,53 @@ export type GkAgent = {
 	readonly hooksInstalled: boolean;
 };
 
-/** Returns true if the given CLI executable path exists on disk. Node-side implementation. */
 export function isCliExecutableAvailable(executable: string | undefined): boolean {
 	return typeof executable === 'string' && executable.length > 0 && existsSync(executable);
 }
 
-/** Rejects when the CLI process is killed (e.g. for running past `timeoutMs`); any other failure yields `[]`. */
-export async function fetchAgents(timeoutMs?: number): Promise<GkAgent[]> {
-	try {
-		// cwd doesn't matter for `agents list` (verified) — runCLICommand's default is fine
-		const output = await runCLICommand(['agents', 'list', '--json'], { timeout: timeoutMs });
-		return parseAgents(output);
-	} catch (ex) {
-		Logger.error(ex, 'Failed to get agent list from CLI');
-		// A killed process means detection never finished, not that there are no agents — `[]` would be cached as
-		// such. `killed` covers a process that exits by signal (a `CancelledRunError`) and one that traps the
-		// SIGTERM and exits with a code instead (a plain `RunError`)
-		if (ex instanceof RunError && ex.killed === true) throw ex;
+const agents = [
+	{ name: 'claude-cli', executable: 'claude', displayName: 'Claude Code' },
+	{ name: 'codex', executable: 'codex', displayName: 'Codex' },
+	{ name: 'copilot', executable: 'copilot', displayName: 'GitHub Copilot CLI' },
+	{ name: 'gemini', executable: 'gemini', displayName: 'Gemini CLI' },
+	{ name: 'opencode', executable: 'opencode', displayName: 'OpenCode' },
+] as const;
 
-		return [];
-	}
-}
+/** Detect user-installed agents locally without executing a vendor installer or contacting a service. */
+export function fetchAgents(_timeoutMs?: number): Promise<GkAgent[]> {
+	const directories = (process.env.PATH ?? '').split(delimiter).filter(Boolean);
+	const suffixes =
+		process.platform === 'win32' ? ['', ...(process.env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';')] : [''];
+	return Promise.resolve(
+		agents.map(agent => {
+			let executable: string | undefined;
+			for (const directory of directories) {
+				for (const suffix of suffixes) {
+					const candidate = join(directory, `${agent.executable}${suffix}`);
+					try {
+						if (!statSync(candidate, { throwIfNoEntry: false })?.isFile()) continue;
 
-function parseAgents(output: string): GkAgent[] {
-	let raw: unknown;
-	try {
-		raw = JSON.parse(output);
-	} catch (ex) {
-		Logger.error(ex, `'gk agents list' returned non-JSON: ${output.slice(0, 500)}`);
-		return [];
-	}
-	if (!Array.isArray(raw)) return [];
+						accessSync(candidate, process.platform === 'win32' ? constants.F_OK : constants.X_OK);
+						executable = candidate;
+						break;
+					} catch {
+						continue;
+					}
+				}
 
-	const agents: GkAgent[] = [];
-	for (const item of raw as unknown[]) {
-		if (item == null || typeof item !== 'object') continue;
+				if (executable != null) break;
+			}
 
-		const a = item as Record<string, unknown>;
-		if (
-			typeof a.name !== 'string' ||
-			typeof a.displayName !== 'string' ||
-			typeof a.detected !== 'boolean' ||
-			typeof a.mcpSupported !== 'boolean' ||
-			typeof a.mcpInstalled !== 'boolean' ||
-			typeof a.hooksSupported !== 'boolean' ||
-			typeof a.hooksInstalled !== 'boolean'
-		) {
-			continue;
-		}
-
-		agents.push({
-			name: a.name,
-			displayName: a.displayName,
-			detected: a.detected,
-			executable: typeof a.executable === 'string' ? a.executable : undefined,
-			mcpSupported: a.mcpSupported,
-			mcpInstalled: a.mcpInstalled,
-			hooksSupported: a.hooksSupported,
-			hooksInstalled: a.hooksInstalled,
-		});
-	}
-	return agents;
+			return {
+				name: agent.name,
+				displayName: agent.displayName,
+				executable: executable,
+				detected: executable != null,
+				mcpSupported: false,
+				mcpInstalled: false,
+				hooksSupported: false,
+				hooksInstalled: false,
+			};
+		}),
+	);
 }

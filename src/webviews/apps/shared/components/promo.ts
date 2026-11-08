@@ -111,6 +111,7 @@ export class GlPromo extends LitElement {
 					this.hasPromo = true;
 					return html`<p class="promo" part="text">${unsafeHTML(content.info.html)}</p>`;
 				}
+
 				break;
 
 			case 'link':
@@ -127,6 +128,7 @@ export class GlPromo extends LitElement {
 						></a
 					>`;
 				}
+
 				break;
 		}
 
@@ -140,7 +142,7 @@ export class GlPromo extends LitElement {
 			command = promo.content.webview.link.command.substring('command:'.length) as GlExtensionCommands;
 		}
 
-		return createCommandLink<Source>(command ?? 'gitlens.plus.upgrade', this.source);
+		return createCommandLink<Source>(command ?? 'gitlens.showSettingsPage!account', this.source);
 	}
 
 	override focus(): void {

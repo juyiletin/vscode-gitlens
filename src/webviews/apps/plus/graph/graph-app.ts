@@ -74,7 +74,6 @@ import type { CapturedComparison } from './components/detailsState.js';
 import { shouldRestoreCapturedComparison } from './components/detailsState.js';
 import type { BranchSheetRef } from './components/gl-graph-branch-sheet-pane.js';
 import type { GlGraphDetailsPanel } from './components/gl-graph-details-panel.js';
-import type { GlGraphFeedbackDialog } from './components/gl-graph-feedback-dialog.js';
 import type { GlGraphKeyboardShortcuts } from './components/gl-graph-keyboard-shortcuts.js';
 import type {
 	GlGraphTimelineCommitSelectDetail,
@@ -95,8 +94,6 @@ import type { GraphCrossPaneState } from './graphCrossPaneState.js';
 import { abortRunningOperations, createGraphCrossPaneState, graphCrossPaneContext } from './graphCrossPaneState.js';
 import type { GraphLaunchpadState } from './graphLaunchpadState.js';
 import { createGraphLaunchpadState, graphLaunchpadContext } from './graphLaunchpadState.js';
-import type { GraphNotificationsState } from './graphNotificationsState.js';
-import { createGraphNotificationsState, graphNotificationsContext } from './graphNotificationsState.js';
 import type { GlGraphHover } from './hover/graphHover.js';
 import { JumpToastController } from './jumpToastController.js';
 import { createGraphKeymapDispatcher } from './keymap/graphKeymap.js';
@@ -141,7 +138,6 @@ import '../../shared/components/button.js';
 import '@gitlens/components/components/codeIcon.js';
 import '../../shared/components/overlays/drag-shift-overlay.js';
 import './components/gl-graph-details-panel.js';
-import './components/gl-graph-feedback-dialog.js';
 import './components/gl-graph-health-banner.js';
 import './components/gl-graph-preview-banner.js';
 import './components/gl-graph-jump-toast.js';
@@ -224,11 +220,14 @@ export class GraphApp extends SignalWatcher(LitElement) {
 
 	private _sidebarSnap = ({ pos, source }: { pos: number; source: GlSplitPanelSnapSource }) => {
 		if (pos < sidebarMinPct / 2) return 0;
+
 		if (pos < sidebarMinPct) return sidebarMinPct;
+
 		if (pos > sidebarMaxPct) return sidebarMaxPct;
 		// Keyboard steps by 1%, smaller than this magnet's ±1.5% window, so the magnet would
 		// capture every step and the position could never leave 20% — skip it for keyboard.
 		if (source !== 'keyboard' && Math.abs(pos - sidebarDefaultPct) <= 1.5) return sidebarDefaultPct;
+
 		return pos;
 	};
 
@@ -255,9 +254,11 @@ export class GraphApp extends SignalWatcher(LitElement) {
 			// capture every step and the position could never leave the default — skip it for keyboard.
 			out = 100 - detailsDefaultPct;
 		}
+
 		if (100 - out < minPct) {
 			out = 100 - minPct;
 		}
+
 		return out;
 	};
 
@@ -279,9 +280,13 @@ export class GraphApp extends SignalWatcher(LitElement) {
 
 		const px = (pos / 100) * size;
 		if (px < minimapDefaultPx / 2) return 0;
+
 		if (px < minimapDefaultPx) return defaultPct;
+
 		if (pos > minimapMaxPct) return minimapMaxPct;
+
 		if (Math.abs(px - minimapDefaultPx) <= 2) return defaultPct;
+
 		return pos;
 	};
 
@@ -500,6 +505,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 		if (this.displayMode !== 'graph') {
 			return { single: this._altModeSelectedCommit, multi: undefined };
 		}
+
 		return { single: this._selectedCommit, multi: this._selectedCommits };
 	}
 
@@ -510,6 +516,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 	 *  {@link toGraphRowSha}. */
 	private get activeAnchorShas(): readonly string[] | undefined {
 		if (this.displayMode !== 'graph') return undefined;
+
 		if (this._selectedCommits != null) return this._selectedCommits.shas;
 
 		const single = this._selectedCommit;
@@ -653,14 +660,6 @@ export class GraphApp extends SignalWatcher(LitElement) {
 	 *  first resolves (a `@consume`d context value, so it isn't in `updated`'s changedProperties). */
 	private _launchpadInitialized = false;
 
-	// Shared GitKraken notifications inbox for the header's bell — seeded and kept fresh here (see
-	// `graphNotificationsState.ts`), so the bell never fetches on its own.
-	@provide({ context: graphNotificationsContext })
-	private readonly _notificationsState: GraphNotificationsState = createGraphNotificationsState();
-
-	/** One-shot guard for the notifications inbox wiring (same `services` pattern as the Launchpad's). */
-	private _notificationsInitialized = false;
-
 	// Account/integrations state (issue #5411). The account rollup's chips consume these shared
 	// contexts; provide them here (the common ancestor) and populate from the host once
 	// `services` resolves. `promosContext` is provided globally by the app host.
@@ -711,7 +710,6 @@ export class GraphApp extends SignalWatcher(LitElement) {
 	 *  started from `updated()` once `services` resolves. */
 	private readonly accountLaunchpad = new AccountLaunchpadController(this, {
 		launchpadState: () => this._launchpadState,
-		notificationsState: () => this._notificationsState,
 		subscriptionCtx: () => this._subscriptionCtx,
 		integrationsState: () => this._integrationsState,
 		aiState: () => this._aiState,
@@ -757,9 +755,6 @@ export class GraphApp extends SignalWatcher(LitElement) {
 
 	@query('gl-graph-keyboard-shortcuts')
 	private readonly keyboardShortcutsEl: GlGraphKeyboardShortcuts | undefined;
-
-	@query('gl-graph-feedback-dialog')
-	private readonly feedbackDialogEl: GlGraphFeedbackDialog | undefined;
 
 	/** One-shot file/folder scope pushed into the embedded timeline (Visual History) by a graph
 	 *  context-menu action. Cleared once `gl-graph-timeline` reports it applied. */
@@ -898,6 +893,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 		if (this._observedGraphRoot != null) {
 			this._graphSizeObserver.unobserve(this._observedGraphRoot);
 		}
+
 		this._observedGraphRoot = el;
 		if (el != null) {
 			this._graphSizeObserver.observe(el);
@@ -962,6 +958,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 					graph.style.height = `${size.height}px`;
 					graph.style.contain = 'size layout';
 				}
+
 				if (this._releaseSuspensionRafId != null) {
 					cancelAnimationFrame(this._releaseSuspensionRafId);
 					this._releaseSuspensionRafId = undefined;
@@ -974,6 +971,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 				if (this._releaseSuspensionRafId != null) {
 					cancelAnimationFrame(this._releaseSuspensionRafId);
 				}
+
 				this._releaseSuspensionRafId = requestAnimationFrame(() => {
 					this._releaseSuspensionRafId = undefined;
 					graph.style.width = '';
@@ -1084,6 +1082,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 		if (this.graphState.searchRequest != null) {
 			this.graphState.searchRequest = undefined;
 		}
+
 		if (this.graphState.displayMode !== 'graph') {
 			this.graphState.displayMode = 'graph';
 		}
@@ -1226,6 +1225,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 			} else {
 				await this.scopeToBranch();
 			}
+
 			return;
 		}
 
@@ -1289,6 +1289,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 				if (isWipSelectionSha(sha)) {
 					this.overviewBar.unscopeToRevealWip(rowSha);
 				}
+
 				void this.graph?.navigateToCommit(rowSha, { source: 'selection-sync', reveal: 'if-changed' });
 			}
 		}
@@ -1396,6 +1397,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 		while (this.detailsPanelEl == null && performance.now() - start < timeoutMs) {
 			await new Promise<void>(resolve => setTimeout(resolve, 30));
 		}
+
 		return this.detailsPanelEl;
 	}
 
@@ -1572,6 +1574,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 		) {
 			this._postSignInPending = true;
 		}
+
 		this._wasAccountGated = accountGated;
 
 		// A task action arriving while the interstitial is up trumps onboarding — yield in willUpdate
@@ -1665,6 +1668,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 				this.graphState.searchRequest = parkedSearch;
 			}
 		}
+
 		this._wasAccessGated = gated;
 	}
 
@@ -1727,11 +1731,6 @@ export class GraphApp extends SignalWatcher(LitElement) {
 			void this.accountLaunchpad.initAccountContexts(this.services);
 		}
 
-		if (!this._notificationsInitialized && this.services != null) {
-			this._notificationsInitialized = true;
-			void this.accountLaunchpad.initNotifications(this.services);
-		}
-
 		if (!this._pullRequestChangedInitialized && this.services != null) {
 			this._pullRequestChangedInitialized = true;
 			void this.subscribeToPullRequestChanges(this.services);
@@ -1758,6 +1757,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 			if (isRepoSwitch) {
 				this.minimapEl?.resetZoom();
 			}
+
 			this._wasSelectedRepository = selectedRepository;
 		}
 
@@ -1787,6 +1787,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 				if (this.graphState.config?.detailsLocation == null) {
 					fireAndForget(this.updateGraphConfig({ detailsLocation: 'auto' }), 'configuration/update');
 				}
+
 				const pane = this.querySelector<HTMLElement>('.graph__details-pane');
 				if (pane) {
 					const isBottom = this.effectiveDetailsLocation === 'bottom';
@@ -1796,6 +1797,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 					if (isBottom) {
 						pane.classList.add('-vertical');
 					}
+
 					pane.addEventListener('animationend', () => pane.classList.remove('details-opening', '-vertical'), {
 						once: true,
 					});
@@ -1831,6 +1833,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 			} else if (this._wasDisplayMode === 'kanban') {
 				emitTelemetrySentEvent(this, { name: 'graph/kanban/closed', data: {} });
 			}
+
 			this._wasDisplayMode = displayMode;
 			// Notify the host so it can fetch row stats when entering Visualizations mode (stats are
 			// otherwise only loaded when the minimap or changes column is visible).
@@ -1998,7 +2001,6 @@ export class GraphApp extends SignalWatcher(LitElement) {
 							@gl-search-exit=${this.handleSearchExit}
 							@gl-graph-scope-to-branch=${this.handleScopeToBranchFromHeader}
 							@gl-graph-show-pr-sheet=${this.handleShowPrSheet}
-							@gl-graph-show-feedback=${this.handleShowFeedback}
 						></gl-graph-header>
 					`,
 				)}
@@ -2178,10 +2180,6 @@ export class GraphApp extends SignalWatcher(LitElement) {
 					.keymap=${this.keymap}
 					@gl-graph-keyboard-shortcuts-closed=${() => this.graph?.focus()}
 				></gl-graph-keyboard-shortcuts>
-				<gl-graph-feedback-dialog
-					.keymap=${this.keymap}
-					@gl-graph-feedback-closed=${() => this.graph?.focus()}
-				></gl-graph-feedback-dialog>
 				${
 					this.graphState.config?.sidebar
 						? this.renderSidebarSplit(!isGraphMode)
@@ -2214,12 +2212,6 @@ export class GraphApp extends SignalWatcher(LitElement) {
 		this.keyboardShortcutsEl?.show();
 	};
 
-	/** The header's account-popover "Send Feedback" entry point — the title-toolbar command instead
-	 *  reaches the dialog directly via its own `feedback.onRequestShow` subscription. */
-	private handleShowFeedback = (): void => {
-		this.feedbackDialogEl?.show('account');
-	};
-
 	/** Branch/tag pill focus → open/close the branch sheet in the details panel, mirroring the pill's
 	 *  pinned state (`detail.open`). Opening ensures the pane is visible. */
 	private handleOpenBranchSheet = (
@@ -2240,10 +2232,12 @@ export class GraphApp extends SignalWatcher(LitElement) {
 			if (this._detailsRevealFor === 'branch') {
 				this._detailsRevealToken++;
 			}
+
 			this._branchSheetOpen = false;
 			this.detailsPanelEl?.closeBranchSheet();
 			return;
 		}
+
 		if (e.detail.name == null) return;
 
 		const ref: BranchSheetRef = {
@@ -2335,6 +2329,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 		} else {
 			members[index] = pr;
 		}
+
 		members.sort((a, b) => (b.stack?.position ?? 0) - (a.stack?.position ?? 0));
 
 		return members.length >= 2 ? members : undefined;
@@ -2365,6 +2360,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 			if (this._prSheetResolveTargetKey !== sheetKey({ kind: 'pullRequest', target: target })) {
 				this.detailsPanelEl?.cancelPrSheet(target);
 			}
+
 			return true;
 		}
 
@@ -2409,6 +2405,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 			const resolved = await this._sidebarActions?.resolvePullRequestSheet({ number: number });
 			// Superseded by a newer resolve call — that call owns success/fallback, not this one.
 			if (token !== this._prSheetResolveToken) return 'stale';
+
 			if (resolved == null) return 'failed';
 
 			return resolved;
@@ -2449,6 +2446,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 			const resolved = await this._sidebarActions?.resolvePullRequestSheet({ stackNumber: stackNumber });
 			// Superseded by a newer resolve call — that call owns success/fallback, not this one.
 			if (token !== this._prSheetResolveToken) return 'stale';
+
 			if (resolved == null) return 'failed';
 
 			return resolved;
@@ -3018,6 +3016,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 		if (!this.minimapShown) {
 			updates.visible = true;
 		}
+
 		gs.minimap = updates;
 	}
 
@@ -3039,6 +3038,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 			if (e.detail.closed && this.minimapSearchActive) {
 				this.dismissMinimapForSearch();
 			}
+
 			return;
 		}
 
@@ -3097,6 +3097,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 			if (gs.sidebar?.visible !== false) {
 				gs.sidebar = { visible: false };
 			}
+
 			return;
 		}
 
@@ -3106,10 +3107,12 @@ export class GraphApp extends SignalWatcher(LitElement) {
 			next.visible = true;
 			opened = true;
 		}
+
 		if (gs.sidebar?.activePanel == null) {
 			next.activePanel = 'overview';
 			opened = true;
 		}
+
 		next.position = e.detail.position;
 		gs.sidebar = next;
 		if (opened) {
@@ -3234,6 +3237,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 				// Engaging is an instant snap, same as the panel's own toggle — only the RELEASE glides.
 				this._sheetMaximized = true;
 			}
+
 			return;
 		}
 
@@ -3300,6 +3304,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 				this._nextStepsShownWhileHidden = false;
 				this.trackUsage('action:gitlens.graph.details.wipShown:happened');
 			}
+
 			const host = this.graphState.webviewId === 'gitlens.graph' ? 'editor' : 'view';
 			const location = this.effectiveDetailsLocation;
 			emitTelemetrySentEvent(this, {
@@ -3677,12 +3682,15 @@ export class GraphApp extends SignalWatcher(LitElement) {
 		if (e.detail.period != null) {
 			next.period = e.detail.period;
 		}
+
 		if (e.detail.sliceBy != null) {
 			next.sliceBy = e.detail.sliceBy;
 		}
+
 		if (e.detail.showAllBranches != null) {
 			next.showAllBranches = e.detail.showAllBranches;
 		}
+
 		gs.timeline = next;
 		this.persistState();
 	};
@@ -3704,6 +3712,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 			if (!gs.rowsStatsIncluded) {
 				gs.rowsStatsLoading = true;
 			}
+
 			gs.displayMode = 'visualizations';
 		}
 
@@ -3975,6 +3984,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 			if (sha != null) {
 				this.overviewBar.revealForScope(sha, branchName, branch.id, 'sidebar');
 			}
+
 			return;
 		}
 
@@ -4198,6 +4208,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 					}
 				}
 			}
+
 			result = { start: scope.mergeBase.date, end: end };
 		}
 
@@ -4312,6 +4323,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 				minimapMarkerTypes = [...currentTypes];
 				minimapMarkerTypes.splice(index, 1);
 			}
+
 			fireAndForget(this.updateGraphConfig({ minimapMarkerTypes: minimapMarkerTypes }), 'configuration/update');
 		}
 	}
@@ -4560,6 +4572,7 @@ export class GraphApp extends SignalWatcher(LitElement) {
 		} catch {
 			item = undefined;
 		}
+
 		if (item != null) {
 			// The parsed item only carries `webviewItem`/`webviewItemValue` — the host's
 			// `isWebviewItemContext` guard also needs `webview`/`webviewInstance`, which a real

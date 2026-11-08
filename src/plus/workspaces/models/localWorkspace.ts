@@ -41,7 +41,6 @@ export class LocalWorkspace {
 		if (this._repositoriesByName == null || options?.force) {
 			this._repositoriesByName = await this.container.workspaces.resolveWorkspaceRepositoriesByName(this.id, {
 				resolveFromPath: true,
-				usePathMapping: true,
 			});
 		}
 
@@ -68,6 +67,7 @@ export interface LocalWorkspaceDescriptor {
 	description: string;
 	repositories: LocalWorkspaceRepositoryPath[];
 	version: number;
+	codeWorkspaceFilePath?: string;
 }
 
 export interface LocalWorkspaceRepositoryDescriptor extends LocalWorkspaceRepositoryPath {

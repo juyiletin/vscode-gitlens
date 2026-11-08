@@ -3,10 +3,6 @@ import { escapeMarkdown } from '@gitlens/utils/markdown.js';
 import type { Colors } from '../../constants.colors.js';
 import { unknownGitUri } from '../../git/gitUri.js';
 import type {
-	CloudWorkspace,
-	CloudWorkspaceRepositoryDescriptor,
-} from '../../plus/workspaces/models/cloudWorkspace.js';
-import type {
 	LocalWorkspace,
 	LocalWorkspaceRepositoryDescriptor,
 } from '../../plus/workspaces/models/localWorkspace.js';
@@ -18,8 +14,8 @@ export class WorkspaceMissingRepositoryNode extends ViewNode<'workspace-missing-
 	constructor(
 		view: WorkspacesView,
 		parent: ViewNode,
-		public readonly workspace: CloudWorkspace | LocalWorkspace,
-		public readonly wsRepositoryDescriptor: CloudWorkspaceRepositoryDescriptor | LocalWorkspaceRepositoryDescriptor,
+		public readonly workspace: LocalWorkspace,
+		public readonly wsRepositoryDescriptor: LocalWorkspaceRepositoryDescriptor,
 	) {
 		super('workspace-missing-repository', unknownGitUri, view, parent);
 

@@ -1,7 +1,5 @@
 import type { MessageItem } from 'vscode';
 import { l10n, window } from 'vscode';
-import { getNumericFormat } from '@gitlens/utils/date.js';
-import { proTrialLengthInDays } from '../../../../constants.subscription.js';
 import type { Source } from '../../../../constants.telemetry.js';
 import type { Container } from '../../../../container.js';
 import { configuration } from '../../../../system/-webview/configuration.js';
@@ -31,69 +29,6 @@ export async function ensurePlusFeaturesEnabled(): Promise<boolean> {
 	return true;
 }
 
-export async function ensurePaidPlan(container: Container, title: string, source: Source): Promise<boolean> {
-	while (true) {
-		const subscription = await container.subscription.getSubscription();
-		if (subscription.account?.verified === false) {
-			const resend = { title: l10n.t('Resend Email') };
-			const cancel = { title: l10n.t('Cancel'), isCloseAffordance: true };
-			const result = await window.showWarningMessage(
-				l10n.t('{0}\n\nYou must verify your email before you can continue.', title),
-				{ modal: true },
-				resend,
-				cancel,
-			);
-
-			if (result === resend) {
-				if (await container.subscription.resendVerification(source)) {
-					continue;
-				}
-			}
-
-			return false;
-		}
-
-		const plan = subscription.plan.effective.id;
-		if (isSubscriptionPaidPlan(plan)) break;
-
-		if (subscription.account == null) {
-			const signUp = { title: l10n.t('Try GitLens Pro') };
-			const signIn = { title: l10n.t('Sign In') };
-			const cancel = { title: l10n.t('Cancel'), isCloseAffordance: true };
-			const result = await window.showWarningMessage(
-				l10n.t(
-					'{0}\n\nDo you want to start your free {1}-day Pro trial for full access to all GitLens Pro features?',
-					title,
-					getNumericFormat()(proTrialLengthInDays),
-				),
-				{ modal: true },
-				signUp,
-				signIn,
-				cancel,
-			);
-
-			if (result === signUp || result === signIn) {
-				if (await container.subscription.loginOrSignUp(result === signUp, source)) {
-					continue;
-				}
-			}
-		} else {
-			const upgrade = { title: l10n.t('Upgrade to Pro') };
-			const cancel = { title: l10n.t('Cancel'), isCloseAffordance: true };
-			const result = await window.showWarningMessage(
-				l10n.t('{0}\n\nDo you want to upgrade for full access to all GitLens Pro features?', title),
-				{ modal: true },
-				upgrade,
-				cancel,
-			);
-
-			if (result === upgrade) {
-				void container.subscription.upgrade('pro', source);
-			}
-		}
-
-		return false;
-	}
-
-	return true;
+export async function ensurePaidPlan(container: Container, _title: string, _source: Source): Promise<boolean> {
+	return isSubscriptionPaidPlan((await container.subscription.getSubscription()).plan.effective.id);
 }

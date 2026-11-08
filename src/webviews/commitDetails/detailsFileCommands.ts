@@ -100,6 +100,7 @@ export class DetailsFileCommands {
 		} else {
 			void openChanges(file, commit, { preserveFocus: true, preview: true, ...showOptions });
 		}
+
 		if (this.source != null) {
 			this.container.events.fire('file:selected', { uri: file.uri }, { source: this.source });
 		}
@@ -298,6 +299,7 @@ export class DetailsFileCommands {
 	): Promise<GitWorktree | undefined> {
 		const worktrees = await getReachableWorktrees(this.container, commit.repoPath, commit.sha);
 		if (!worktrees.length) return undefined;
+
 		if (worktrees.length === 1) return worktrees[0];
 
 		return showWorktreePicker(title, placeholder, worktrees);
@@ -763,35 +765,6 @@ export class DetailsFileCommands {
 			range: false,
 		});
 	}
-	@command('gitlens.shareAsCloudPatch:')
-	@debug()
-	async shareAsCloudPatch(
-		commit: GitCommit,
-		_file: GitFileChange,
-		_showOptions?: TextDocumentShowOptions,
-		comparison?: ComparisonContext,
-	): Promise<void> {
-		if (comparison != null) {
-			void executeCommand<CreatePatchCommandArgs>('gitlens.createCloudPatch', {
-				to: commit.ref,
-				from: comparison.sha,
-				repoPath: commit.repoPath,
-			});
-		} else {
-			if (commit.message == null) {
-				await GitCommit.ensureFullDetails(commit);
-			}
-
-			const { summary: title, body: description } = splitMessage(commit.message);
-
-			void executeCommand<CreatePatchCommandArgs>('gitlens.createCloudPatch', {
-				to: commit.ref,
-				repoPath: commit.repoPath,
-				title: title,
-				description: description,
-			});
-		}
-	}
 	// --- Multi-file actions (right-clicking a multi-selection). Each receives the selected files
 	// resolved from `webviewItemsValues`; the host registration loop does the resolution. ---
 
@@ -971,6 +944,7 @@ export class DetailsFileCommands {
 				title: l10n.t('Changes in {0}', commit.shortSha),
 			};
 		}
+
 		await this._files.openMultipleChanges(args);
 	}
 
@@ -979,6 +953,7 @@ export class DetailsFileCommands {
 		if (!isUncommitted(commit.sha)) {
 			return svc.getRevisionUri(commit.sha, file.path);
 		}
+
 		return svc.getAbsoluteUri(file.path, commit.repoPath);
 	}
 }

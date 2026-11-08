@@ -45,17 +45,13 @@ export function isDeepLinkCommandType(type: string): type is DeepLinkCommandType
 }
 
 export const DeepLinkCommandTypeToCommand = new Map<DeepLinkCommandType, GlCommands>([
-	[DeepLinkCommandType.CloudPatches, 'gitlens.showDraftsView'],
 	[DeepLinkCommandType.Graph, 'gitlens.showGraph'],
 	[DeepLinkCommandType.Home, 'gitlens.showGraph'],
 	[DeepLinkCommandType.Inspect, 'gitlens.showCommitDetailsView'],
 	[DeepLinkCommandType.Launchpad, 'gitlens.showLaunchpad'],
-	[DeepLinkCommandType.Login, 'gitlens.plus.login'],
-	[DeepLinkCommandType.SignUp, 'gitlens.plus.signUp'],
 	// StartReview and StartWork are handled specially in DeepLinkService
 	[DeepLinkCommandType.Walkthrough, 'gitlens.getStarted'],
 	[DeepLinkCommandType.Worktrees, 'gitlens.showWorktreesView'],
-	[DeepLinkCommandType.InstallMCP, 'gitlens.ai.mcp.install'],
 ]);
 
 /** Optional `mode` param on a `link/command/graph` deep link — opens the Commit Graph straight into
@@ -145,10 +141,12 @@ export function parseDeepLinkUri(uri: Uri): DeepLink | undefined {
 			if (remoteUrl != null) {
 				remoteUrl = decodeURIComponent(remoteUrl);
 			}
+
 			let repoPath = urlParams.get('path') ?? undefined;
 			if (repoPath != null) {
 				repoPath = decodeURIComponent(repoPath);
 			}
+
 			if (!remoteUrl && !repoPath) return undefined;
 
 			const action = urlParams.get('action') ?? undefined;
@@ -186,11 +184,13 @@ export function parseDeepLinkUri(uri: Uri): DeepLink | undefined {
 				if (ref != null) {
 					ref = decodeURIComponent(ref);
 				}
+
 				targetId = ref;
 				let lines = urlParams.get('lines') ?? undefined;
 				if (lines != null) {
 					lines = decodeURIComponent(lines);
 				}
+
 				secondaryTargetId = lines;
 			} else {
 				targetId = joined;

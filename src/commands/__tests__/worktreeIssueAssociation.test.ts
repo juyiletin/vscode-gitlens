@@ -49,6 +49,7 @@ function createHarness(options?: { write?: () => Promise<void>; create?: () => P
 	writes: () => number;
 	creates: () => number;
 } {
+	const workspaceStorage = new Map<string, unknown>();
 	let encoded: string | undefined;
 	let writes = 0;
 	let creates = 0;
@@ -86,7 +87,12 @@ function createHarness(options?: { write?: () => Promise<void>; create?: () => P
 		views: { branches: {}, worktrees: { visible: false } },
 		integrations: { getConfigured: () => [] },
 		events: { fire: () => {} },
-		storage: { getWorkspace: () => undefined },
+		storage: {
+			getWorkspace: (key: string) => workspaceStorage.get(key),
+			storeWorkspace: async (key: string, value: unknown) => {
+				workspaceStorage.set(key, value);
+			},
+		},
 	} as unknown as Container;
 	return {
 		container: container,

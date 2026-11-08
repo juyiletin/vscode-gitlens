@@ -14,7 +14,6 @@ import { AIProviderService } from '../aiProviderService.js';
  */
 suite('AIProviderService — a quota error notification', () => {
 	const copilot = { id: 'vscode', name: 'Copilot' } as const;
-	const gitkraken = { id: 'gitkraken', name: 'GitKraken AI' } as const;
 
 	function makeModel(provider: { id: string; name: string }) {
 		return { id: 'model-1', name: 'Model 1', provider: provider } as unknown as AIModel;
@@ -135,27 +134,5 @@ suite('AIProviderService — a quota error notification', () => {
 		assert.deepStrictEqual(shown, [{ message: error.message, buttons: ['Switch Model'] }]);
 		assert.match(shown[0].message, /no longer available from Copilot/);
 		assert.strictEqual(subscriptionReads.length, 0);
-	});
-
-	test('keeps offering GitKraken credits to a GitKraken quota error', async () => {
-		const error = new AIError(AIErrorReason.UserQuotaExceeded);
-
-		const { thrown, shown, subscriptionReads } = await run(error, makeModel(gitkraken));
-
-		assert.strictEqual(thrown, error);
-		assert.strictEqual(subscriptionReads.length, 1);
-		assert.strictEqual(shown.length, 1);
-		assert.match(shown[0].message, /Purchase additional AI credits/);
-		assert.deepStrictEqual(shown[0].buttons, ['Get More Credits', 'Dismiss']);
-	});
-
-	test('tells a GitKraken member who cannot buy credits to contact an admin, as before', async () => {
-		const error = new AIError(AIErrorReason.UserQuotaExceeded, undefined, gitkraken);
-
-		const { shown, subscriptionReads } = await run(error, makeModel(gitkraken), 'member');
-
-		assert.strictEqual(subscriptionReads.length, 1);
-		assert.match(shown[0].message, /Contact your organization admin or owner/);
-		assert.deepStrictEqual(shown[0].buttons, ['OK']);
 	});
 });

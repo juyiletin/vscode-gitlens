@@ -12,7 +12,6 @@ import type { Source } from '../constants.telemetry.js';
 import type { Container } from '../container.js';
 import type { AIModelScope } from '../plus/ai/aiProviderService.js';
 import { ensureAccess } from '../plus/ai/utils/-webview/ai.utils.js';
-import { isSubscriptionPaidPlan } from '../plus/gk/utils/subscription.utils.js';
 import { getQuickPickIgnoreFocusOut } from '../system/-webview/vscode.js';
 import { createQuickPickSeparator } from './items/common.js';
 import type { DirectiveQuickPickItem } from './items/directive.js';
@@ -44,18 +43,15 @@ export async function showAIProviderPicker(
 ): Promise<ProviderQuickPickItem | undefined> {
 	if (!(await ensureAccess(container, { showPicker: true }, source))) return undefined;
 
-	const [providersResult, modelResult, subscriptionResult] = await Promise.allSettled([
+	const [providersResult, modelResult] = await Promise.allSettled([
 		container.ai.getProvidersConfiguration(),
 		// Fetch the *scope's* current model when invoked for a scoped operation so the
 		// "current model" detail line in the picker reflects the scope, not the global default.
 		container.ai.getModel({ silent: true, scope: titles?.scope }, { source: 'ai:picker' }),
-		container.subscription.getSubscription(),
 	]);
 
 	const providers = getSettledValue(providersResult) ?? new Map<AIProviders, AIProviderDescriptorWithConfiguration>();
 	const currentModelName = getSettledValue(modelResult)?.name;
-	const subscription = getSettledValue(subscriptionResult)!;
-	const hasPaidPlan = isSubscriptionPaidPlan(subscription.plan.effective.id) && subscription.account?.verified;
 
 	const quickpick = window.createQuickPick<ProviderQuickPickItem>();
 	quickpick.ignoreFocusOut = getQuickPickIgnoreFocusOut();
@@ -65,13 +61,7 @@ export async function showAIProviderPicker(
 	const disposables: Disposable[] = [];
 
 	try {
-		const pickedProvider =
-			current?.provider ??
-			(providers.get('gitkraken')?.configured
-				? 'gitkraken'
-				: providers.get('vscode')?.configured
-					? 'vscode'
-					: undefined);
+		const pickedProvider = current?.provider ?? (providers.get('vscode')?.configured ? 'vscode' : undefined);
 
 		let addedRequiredKeySeparator = false;
 		while (true) {
@@ -87,19 +77,8 @@ export async function showAIProviderPicker(
 					iconPath: p.id === current?.provider ? new ThemeIcon('check') : new ThemeIcon('blank'),
 					provider: p.id,
 					picked: p.id === pickedProvider,
-					detail:
-						p.id === current?.provider && currentModelName
-							? `      ${currentModelName}`
-							: p.id === 'gitkraken'
-								? `      ${l10n.t('Models provided by GitKraken')}`
-								: undefined,
+					detail: p.id === current?.provider && currentModelName ? `      ${currentModelName}` : undefined,
 					buttons: !p.primary ? (p.configured ? [ClearAIKeyButton] : [ConfigureAIKeyButton]) : undefined,
-					description:
-						p.id === 'gitkraken'
-							? hasPaidPlan
-								? `  ${l10n.t('included in your plan')}`
-								: `  ${l10n.t('included in GitLens Pro')}`
-							: undefined,
 				} satisfies ProviderQuickPickItem);
 			}
 
@@ -148,6 +127,7 @@ function getSwitchProviderDetail(providers: readonly AIProviderDescriptor[]): st
 
 	if (!keyProviders.length) {
 		if (!primaries.length) return undefined;
+
 		if (primaries.length === 1) return l10n.t('Choose {0}', primaries[0]);
 
 		const last = primaries.at(-1)!;
@@ -187,7 +167,7 @@ export async function showAIModelPicker(
 	current?: AIModelDescriptor,
 	source?: Source,
 	titles?: { title?: string; placeholder?: string },
-	scope?: AIModelScope,
+	_scope?: AIModelScope,
 	options?: { availableProviders: readonly AIProviderDescriptor[] },
 ): Promise<ModelQuickPickItem | Directive | undefined> {
 	if (!(await ensureAccess(container, { showPicker: true }, source))) return undefined;
@@ -227,9 +207,8 @@ export async function showAIModelPicker(
 			directive: Directive.Noop,
 		} satisfies ModelQuickPickItem | DirectiveQuickPickItem);
 	} else {
-		const scopedDefaultModelId =
-			provider === 'gitkraken' && scope != null ? 'gemini:gemini-3-flash-preview' : undefined;
-		const useScopedDefault = scopedDefaultModelId != null && current?.provider !== provider;
+		const scopedDefaultModelId = undefined;
+		const useScopedDefault = false;
 
 		for (const m of models) {
 			if (m.hidden) continue;
@@ -241,6 +220,7 @@ export async function showAIModelPicker(
 			if (m.consumptionRateLabel) {
 				badges.push(m.consumptionRateLabel);
 			}
+
 			if (m.default) {
 				badges.push(l10n.t('recommended'));
 			}

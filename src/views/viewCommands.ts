@@ -58,7 +58,6 @@ import {
 	getRemoteNameForPullRequestOwner,
 } from '../git/utils/-webview/pullRequest.utils.js';
 import { openRebaseEditor } from '../git/utils/-webview/rebase.utils.js';
-import { showPatchesView } from '../plus/drafts/actions.js';
 import { getPullRequestBranchDeepLink } from '../plus/launchpad/launchpadProvider.js';
 import type { AssociateIssueWithBranchCommandArgs } from '../plus/startWork/associateIssueWithBranch.js';
 import { showContributorsPicker } from '../quickpicks/contributorsPicker.js';
@@ -101,7 +100,6 @@ import type { CommitNode } from './nodes/commitNode.js';
 import type { PagerNode } from './nodes/common.js';
 import type { CompareResultsNode } from './nodes/compareResultsNode.js';
 import type { ContributorNode } from './nodes/contributorNode.js';
-import type { DraftNode } from './nodes/draftNode.js';
 import type { FileHistoryNode } from './nodes/fileHistoryNode.js';
 import type { FileRevisionAsCommitNode } from './nodes/fileRevisionAsCommitNode.js';
 import type { FolderNode } from './nodes/folderNode.js';
@@ -145,6 +143,7 @@ export class ViewCommands implements Disposable {
 		for (const { command, handler, options } of getCommands()) {
 			subscriptions.push(registerViewCommand(command, handler, this, options));
 		}
+
 		this._disposable = Disposable.from(...subscriptions);
 	}
 
@@ -426,6 +425,7 @@ export class ViewCommands implements Disposable {
 			const branch = await repo.git.branches.getBranch();
 			from = branch;
 		}
+
 		return BranchActions.create(node?.repoPath, from);
 	}
 
@@ -481,6 +481,7 @@ export class ViewCommands implements Disposable {
 			const branch = await repo.git.branches.getBranch();
 			from = branch;
 		}
+
 		return TagActions.create(node?.repoPath, from);
 	}
 
@@ -491,6 +492,7 @@ export class ViewCommands implements Disposable {
 		if (node?.is('worktrees')) {
 			node = undefined;
 		}
+
 		const ref =
 			node instanceof ViewRefNode || node instanceof ViewRefFileNode
 				? node.ref
@@ -574,12 +576,16 @@ export class ViewCommands implements Disposable {
 		node: RemoteNode | RepositoryNode | RepositoryFolderNode | BranchNode | BranchTrackingStatusNode | WorktreeNode,
 	) {
 		if (node.isAny('repository', 'repo-folder')) return RepoActions.fetch(node.repo);
+
 		if (node.is('remote')) return RemoteActions.fetch(node.remote.repoPath, node.remote.name);
+
 		if (node.isAny('branch', 'tracking-status')) {
 			return RepoActions.fetch(node.repoPath, node.root ? undefined : node.branch);
 		}
+
 		if (node.is('worktree')) {
 			if (node.branch == null) return Promise.resolve();
+
 			return RepoActions.fetch(node.repoPath, node.branch);
 		}
 
@@ -808,19 +814,6 @@ export class ViewCommands implements Disposable {
 		return this.container.views.searchAndCompare.compare(refs.repoPath, refs.head, refs.base);
 	}
 
-	@command('gitlens.views.draft.open')
-	@debug()
-	private async openDraft(node: DraftNode) {
-		await showPatchesView({ mode: 'view', draft: node.draft });
-	}
-
-	@command('gitlens.views.draft.openOnWeb')
-	@debug()
-	private async openDraftOnWeb(node: DraftNode) {
-		const url = await this.container.drafts.generateWebUrl(node.draft);
-		await openUrl(url);
-	}
-
 	@command('gitlens.openWorktree:views')
 	@command('gitlens.openWorktreeInNewWindow:views', { args: a => [a, undefined, { location: 'newWindow' }] })
 	@command('gitlens.openWorktreeInNewWindow.multi:views', {
@@ -834,6 +827,7 @@ export class ViewCommands implements Disposable {
 		options?: { location?: OpenWorkspaceLocation },
 	) {
 		if (!active.is('branch') && !active.is('worktree')) return;
+
 		if (active.worktree == null) return;
 
 		let uri;
@@ -938,10 +932,13 @@ export class ViewCommands implements Disposable {
 		if (node.isAny('branch', 'tracking-status')) {
 			return RepoActions.push(node.repoPath, undefined, node.branch);
 		}
+
 		if (node.is('worktree')) {
 			if (node.branch == null) return Promise.resolve();
+
 			return RepoActions.push(node.repoPath, undefined, node.branch);
 		}
+
 		return Promise.resolve();
 	}
 
@@ -959,11 +956,14 @@ export class ViewCommands implements Disposable {
 	@debug()
 	private pull(node: RepositoryNode | RepositoryFolderNode | BranchNode | BranchTrackingStatusNode | WorktreeNode) {
 		if (node.isAny('repository', 'repo-folder')) return RepoActions.pull(node.repo);
+
 		if (node.isAny('branch', 'tracking-status')) {
 			return RepoActions.pull(node.repoPath, node.root ? undefined : node.branch);
 		}
+
 		if (node.is('worktree')) {
 			if (node.branch == null) return Promise.resolve();
+
 			return RepoActions.pull(node.repoPath, node.branch);
 		}
 
@@ -994,6 +994,7 @@ export class ViewCommands implements Disposable {
 
 		if (node.is('worktree')) {
 			if (node.branch == null) return Promise.resolve();
+
 			return RepoActions.push(node.repoPath, force, node.branch);
 		}
 
@@ -1724,6 +1725,7 @@ export class ViewCommands implements Disposable {
 					showOptions: { preserveFocus: true, preview: true },
 				});
 			}
+
 			return;
 		}
 
@@ -1939,6 +1941,7 @@ export class ViewCommands implements Disposable {
 				ref: comparison.ref1 || comparison.ref2,
 			});
 		}
+
 		if (!node.isAny('commit', 'stash')) return undefined;
 
 		return CommitActions.openFiles(node.commit);
@@ -1960,6 +1963,7 @@ export class ViewCommands implements Disposable {
 
 			return CommitActions.openOnlyChangedFiles(node.view.container, comparison.files);
 		}
+
 		if (!node.isAny('commit', 'stash')) return undefined;
 
 		return CommitActions.openOnlyChangedFiles(node.view.container, node.commit);
@@ -2030,6 +2034,7 @@ export class ViewCommands implements Disposable {
 				rhs: comparison.ref1,
 			});
 		}
+
 		if (!node.isAny('commit', 'stash')) return undefined;
 
 		return CommitActions.openFilesAtRevision(node.commit, options);
@@ -2139,6 +2144,7 @@ export class ViewCommands implements Disposable {
 				node = parent;
 			}
 		}
+
 		if (!node.is('worktree')) return;
 
 		return WorktreeActions.copyChangesToWorktree('working-tree', node.worktree.repoPath, undefined, node.worktree);

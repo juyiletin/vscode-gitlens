@@ -34,119 +34,6 @@ declare global {
 
 const walkthroughSteps: WalkthroughStep[] = [
 	{
-		id: 'get-started-community',
-		walkthroughKey: 'gettingStarted',
-		title: l10n.t('Welcome to GitLens'),
-		body: html`
-			<p>
-				${l10n.t('The GitLens Community edition lets you track code changes and see who made them with inline blame annotations, hovers, and more—completely free.')}
-			</p>
-			<p>
-				${localizedContent(l10n.t('With {emphasis} (Free 14-Day Trial), you’ll get full access to advanced visualization, collaboration, and built-in AI:'), { emphasis: html`<strong>GitLens Pro</strong>` })}
-			</p>
-			<ul>
-				<li>
-					${localizedContent(l10n.t('{emphasis} visualize every branch and commit relationship'), { emphasis: html`<strong>${l10n.t('Commit Graph:')}</strong>` })}
-				</li>
-				<li>
-					${localizedContent(l10n.t('{emphasis} see how a file has evolved with a graph of what changed and when'), { emphasis: html`<strong>${l10n.t('Visual File History:')}</strong>` })}
-				</li>
-				<li>
-					${localizedContent(l10n.t('{emphasis} manage PRs and branches in one hub'), { emphasis: html`<strong>${l10n.t('Launchpad & Worktrees:')}</strong>` })}
-				</li>
-				<li>
-					${localizedContent(l10n.t('{emphasis} writes commits, PRs & changelogs for you.'), { emphasis: html`<strong>${l10n.t('GitKraken AI:')}</strong>` })}
-				</li>
-			</ul>
-			<div class="card-part--centered">
-				<gl-button class="start-trial-button" href="command:gitlens.welcome.plus.signUp"
-					>${l10n.t('Get Started with GitLens Pro')}</gl-button
-				>
-			</div>
-			<p>
-				${localizedContent(l10n.t('or {link}'), { link: html`<a href="command:gitlens.welcome.plus.login">${l10n.t('sign in')}</a>` })}
-			</p>
-		`,
-		condition: state => !state.plusState || state.plusState < SubscriptionState.Trial,
-	},
-
-	{
-		id: 'welcome-in-trial',
-		walkthroughKey: 'gettingStarted',
-		title: l10n.t('Welcome to GitLens Pro'),
-		body: html`
-			<p>
-				${localizedContent(l10n.t('Thanks for starting your {emphasis} trial.'), { emphasis: html`<strong>GitLens Pro</strong>` })}
-			</p>
-			<p>
-				${l10n.t('Complete this walkthrough to experience enhanced PR review tools, deeper code history visualizations, and streamlined collaboration to help boost your productivity.')}
-			</p>
-			<a href="#continue-walkthrough">${l10n.t('Continue the Walkthrough')}</a>
-			<p>
-				${localizedContent(l10n.t("Once your trial ends, you'll return to {emphasis} — where you can still leverage features like in-editor blame annotations, hovers, CodeLens, and more."), { emphasis: html`<strong>GitLens Community</strong>` })}
-			</p>
-			<div class="card-part--centered">
-				<gl-button class="start-trial-button" href="command:gitlens.welcome.plus.upgrade"
-					>${l10n.t('Upgrade to GitLens Pro')}</gl-button
-				>
-			</div>
-		`,
-		condition: state => state.plusState === SubscriptionState.Trial,
-	},
-
-	{
-		id: 'welcome-in-trial-expired',
-		walkthroughKey: 'gettingStarted',
-		title: l10n.t('Get the most out of GitLens'),
-		body: html`
-			<p>${l10n.t('Thanks for installing GitLens and trying out GitLens Pro.')}</p>
-			<p>
-				${localizedContent(l10n.t("You're now on the {emphasis} edition. Track code changes and see who made them with features like in-editor blame annotations, hovers, CodeLens, and more—completely free."), { emphasis: html`<strong>GitLens Community</strong>` })}
-			</p>
-			<p>
-				${localizedContent(l10n.t('Learn more about the {link}.'), { link: html`<a href="command:gitlens.welcome.openCommunityVsPro">${l10n.t('difference between GitLens Community vs. Pro')}</a>` })}
-			</p>
-			<p>${html`<strong>${l10n.t('Unlock more powerful tools with GitLens Pro')}</strong>`}</p>
-			<div class="card-part--centered">
-				<gl-button class="start-trial-button" href="command:gitlens.welcome.plus.upgrade"
-					>${l10n.t('Upgrade to GitLens Pro')}</gl-button
-				>
-			</div>
-			<p>
-				${l10n.t("With GitLens Pro, you can accelerate PR reviews, visualize code history in-depth, and enhance collaboration across your team. It's the perfect upgrade to streamline your VS Code workflow.")}
-			</p>
-		`,
-		condition: state => state.plusState === SubscriptionState.TrialExpired,
-	},
-
-	{
-		id: 'welcome-in-trial-expired-eligible',
-		walkthroughKey: 'gettingStarted',
-		title: l10n.t('Get the most out of GitLens'),
-		body: html`
-			<p>${l10n.t('Thanks for installing GitLens and trying out GitLens Pro.')}</p>
-			<p>
-				${localizedContent(l10n.t("You're using {emphasis} edition. Track code changes and see who made them with features like in-editor blame annotations, hovers, CodeLens, and more—completely free."), { emphasis: html`<strong>GitLens Community</strong>` })}
-			</p>
-			<p>
-				${localizedContent(l10n.t('{emphasis} free for another 14 days.'), { emphasis: html`<strong>${l10n.t('Unlock more powerful tools — Try GitLens Pro again')}</strong>` })}
-			</p>
-			<div class="card-part--centered">
-				<gl-button class="start-trial-button" href="command:gitlens.welcome.plus.reactivate"
-					>${l10n.t('Reactivate GitLens Pro Trial')}</gl-button
-				>
-			</div>
-			<p>
-				${localizedContent(l10n.t('Or {upgrade} to unlock all Pro features.'), { upgrade: html`<a href="command:gitlens.welcome.plus.upgrade">${l10n.t('upgrade to Pro')}</a>` })}
-			</p>
-			<p>
-				${l10n.t("With GitLens Pro, you can accelerate PR reviews, visualize code history in-depth, and enhance collaboration across your team. It's the perfect upgrade to streamline your VS Code workflow.")}
-			</p>
-		`,
-		condition: state => state.plusState === SubscriptionState.TrialReactivationEligible,
-	},
-
-	{
 		id: 'welcome-paid',
 		walkthroughKey: 'gettingStarted',
 		title: l10n.t('Discover the Benefits of GitLens Pro'),
@@ -292,7 +179,7 @@ const walkthroughSteps: WalkthroughStep[] = [
 				${l10n.t('GitKraken MCP is active in your AI chat, leveraging Git and your integrations to provide context and perform actions. You can also connect MCP to other agents on your machine.')}
 			</p>
 			<div class="card-part--centered">
-				<gl-button href="${createCommandLink('gitlens.ai.mcp.installForAllAgents', { source: 'welcome' })}"
+				<gl-button href="${createCommandLink('gitlens.showSettingsPage!agents', { source: 'welcome' })}"
 					>${l10n.t('Connect More Agents')}</gl-button
 				>
 			</div>
@@ -309,7 +196,7 @@ const walkthroughSteps: WalkthroughStep[] = [
 				${l10n.t('GitKraken MCP is active in your AI chat, leveraging Git and your integrations to provide context and perform actions. You can also connect MCP to other agents on your machine.')}
 			</p>
 			<div class="card-part--centered">
-				<gl-button href="${createCommandLink('gitlens.ai.mcp.installForAllAgents', { source: 'welcome' })}"
+				<gl-button href="${createCommandLink('gitlens.showSettingsPage!agents', { source: 'welcome' })}"
 					>${l10n.t('Connect More Agents')}</gl-button
 				>
 			</div>
@@ -330,7 +217,7 @@ const walkthroughSteps: WalkthroughStep[] = [
 				${l10n.t('Leverage Git and your integrations (issues, PRs, etc) to provide context and perform actions in AI chat.')}
 			</p>
 			<div class="card-part--centered">
-				<gl-button href="${createCommandLink('gitlens.ai.mcp.install', { source: 'welcome' })}"
+				<gl-button href="${createCommandLink('gitlens.showSettingsPage!agents', { source: 'welcome' })}"
 					>${l10n.t('Install GitKraken MCP')}</gl-button
 				>
 			</div>
@@ -492,6 +379,7 @@ export class GlWelcomePage extends SignalWatcher(LitElement) {
 		if (this._state.mode.get() === 'graph') {
 			return this.renderGraphWalkthrough();
 		}
+
 		return this.renderMainWalkthrough();
 	}
 
@@ -539,11 +427,6 @@ export class GlWelcomePage extends SignalWatcher(LitElement) {
 							`,
 						)}
 				</gl-walkthrough>
-				<div class="section section--centered">
-					<p>
-						${localizedContent(l10n.t('You also have access to the {link}, unleashing powerful Git visualization & productivity capabilities everywhere you work: IDE, desktop, browser, and terminal.'), { link: html`<a href="https://gitkraken.dev/tools" target="_blank">${l10n.t('GitKraken DevEx platform')}</a>` })}
-					</p>
-				</div>
 			</div>
 		`;
 	}
@@ -583,11 +466,6 @@ export class GlWelcomePage extends SignalWatcher(LitElement) {
 						`,
 					)}
 				</gl-walkthrough>
-				<div class="section section--centered">
-					<p>
-						${localizedContent(l10n.t('You also have access to the {link}, unleashing powerful Git visualization & productivity capabilities everywhere you work: IDE, desktop, browser, and terminal.'), { link: html`<a href="https://gitkraken.dev/tools" target="_blank">${l10n.t('GitKraken DevEx platform')}</a>` })}
-					</p>
-				</div>
 			</div>
 		`;
 	}

@@ -16,7 +16,6 @@ import type { Container } from '../../container.js';
 import type { GlGitProvider } from '../../git/gitProvider.js';
 import type { RepositoryLocationProvider } from '../../git/location/repositorylocationProvider.js';
 import type { SharedGkStorageLocationProvider } from '../../plus/repos/sharedGkStorageLocationProvider.js';
-import type { GkWorkspacesSharedStorageProvider } from '../../plus/workspaces/workspacesSharedStorageProvider.js';
 import { configuration } from '../../system/-webview/configuration.js';
 import { loadChunk } from '../../system/-webview/loadChunk.js';
 import type { TelemetryService } from '../../telemetry/telemetry.js';
@@ -24,15 +23,9 @@ import { activityDecayToMs } from '../../webviews/plus/graph/graphWebview.utils.
 // import { GitHubGitProvider } from '../../plus/github/githubGitProvider';
 import { GlCliGitProvider } from './git/cliGitProvider.js';
 import { VslsGitProvider } from './git/vslsGitProvider.js';
-import { GkCliService } from './gk/cli/gkCliService.js';
 import { runCLICommand } from './gk/cli/utils.js';
-import { GkMcpService } from './gk/mcp/gkMcpService.js';
-
-export type { GkCliService } from './gk/cli/gkCliService.js';
-export type { GkMcpService } from './gk/mcp/gkMcpService.js';
 import { LocalRepositoryLocationProvider } from './gk/localRepositoryLocationProvider.js';
 import { LocalSharedGkStorageLocationProvider } from './gk/localSharedGkStorageLocationProvider.js';
-import { LocalGkWorkspacesSharedStorageProvider } from './gk/localWorkspacesSharedStorageProvider.js';
 
 // Lightweight Git instance for VSLS host — only used for Live Share command proxying.
 // The primary Git execution path is inside CliGitProvider (created by LocalGitProvider).
@@ -44,6 +37,7 @@ function ensureVslsGit() {
 			isTrusted: () => workspace.isTrusted,
 		});
 	}
+
 	return vslsGitInstance;
 }
 
@@ -92,25 +86,11 @@ export function getSupportedRepositoryLocationProvider(
 	return new LocalRepositoryLocationProvider(container, sharedStorage);
 }
 
-export function getSupportedWorkspacesStorageProvider(
-	container: Container,
-	sharedStorage: SharedGkStorageLocationProvider,
-): GkWorkspacesSharedStorageProvider {
-	return new LocalGkWorkspacesSharedStorageProvider(container, sharedStorage);
-}
-
-export function getGkCliService(container: Container): GkCliService {
-	return new GkCliService(container);
-}
-
-export function getGkMcpService(container: Container, gkCli: GkCliService): GkMcpService {
-	return new GkMcpService(container, gkCli);
-}
-
 export function getAgentSessionProviders(container: Container): AgentSessionProvider[] {
 	return [
 		new GkAgentProvider({
 			ipc: container.ipc,
+			canRunCLICommand: () => Boolean(configuration.get('gitkraken.cli.localPath')),
 			getActivityDecayMs: () =>
 				activityDecayToMs(configuration.get('graph.experimental.visualizations.activityDecay') ?? '5m'),
 			onSessionStarted: provider =>

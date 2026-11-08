@@ -1,9 +1,8 @@
-import { l10n, ThemeIcon } from 'vscode';
+import { l10n, window } from 'vscode';
+import { supportedCloudIntegrationDescriptors } from '@gitlens/integrations/constants.js';
 import type { SupportedCloudIntegrationIds } from '@gitlens/integrations/constants.js';
 import type { Source } from '../constants.telemetry.js';
 import type { Container } from '../container.js';
-import { ensureAccountQuickPick } from '../plus/gk/utils/-webview/acount.utils.js';
-import { createDirectiveQuickPickItem, Directive } from '../quickpicks/items/directive.js';
 import { command } from '../system/-webview/command.js';
 import { GlCommandBase } from './commandBase.js';
 
@@ -34,22 +33,17 @@ export class ConnectCloudIntegrationsCommand extends GlCommandBase {
 	}
 
 	async execute(args?: ConnectCloudIntegrationsCommandArgs): Promise<void> {
-		if ((await this.container.subscription.getSubscription()).account == null) {
-			const allowed = await ensureAccountQuickPick(
-				this.container,
-				createDirectiveQuickPickItem(Directive.Noop, undefined, {
-					label: l10n.t('Connect integrations like GitHub, GitLab, Azure DevOps, Jira, and more'),
-					iconPath: new ThemeIcon('plug'),
-				}),
-				args?.source ?? { source: 'commandPalette' },
-				false,
+		let integrationIds = args?.integrationIds;
+		if (!integrationIds?.length) {
+			const selection = await window.showQuickPick(
+				supportedCloudIntegrationDescriptors.map(item => ({ label: item.name, id: item.id })),
+				{ title: l10n.t('Connect integrations like GitHub, GitLab, Azure DevOps, Jira, and more') },
 			);
-			if (!allowed) return;
+			if (selection == null) return;
+
+			integrationIds = [selection.id];
 		}
 
-		await this.container.integrations.connectCloudIntegrations(
-			args?.integrationIds ? { integrationIds: args.integrationIds } : undefined,
-			args?.source,
-		);
+		await this.container.integrations.connectCloudIntegrations({ integrationIds: integrationIds }, args?.source);
 	}
 }

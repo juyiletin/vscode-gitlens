@@ -34,7 +34,7 @@ export const integrationsCategories: SettingsCategory[] = [
 		name: l10n.t('Agents'),
 		group: 'Integrations',
 		icon: 'robot',
-		hint: l10n.t('Set your default coding agent, and install GitKraken MCP and hooks for supported agents'),
+		hint: l10n.t('Choose a default coding agent and connect installed agents.'),
 		learnMoreUrl: 'https://help.gitkraken.com/gitlens/gl-gk-ai/',
 		controls: [
 			{
@@ -42,7 +42,7 @@ export const integrationsCategories: SettingsCategory[] = [
 				label: l10n.t('Agents'),
 				// Search text — the rendered rows come from the Agents RPC service
 				hint: l10n.t(
-					'Chat, extension, and CLI agents, default agent, GitKraken MCP, agent hooks, Copilot, Cursor, Codex, Gemini, opencode',
+					'Chat, extension, and CLI agents, default agent, Copilot, Cursor, Codex, Gemini, opencode',
 				),
 			},
 		],
@@ -50,7 +50,7 @@ export const integrationsCategories: SettingsCategory[] = [
 	{
 		id: 'integrations',
 		settingsSearch: 'gitlens.integrations',
-		name: l10n.t('Cloud Integrations'),
+		name: l10n.t('Integrations'),
 		group: 'Integrations',
 		icon: 'plug',
 		hint: l10n.t(
@@ -60,12 +60,12 @@ export const integrationsCategories: SettingsCategory[] = [
 		master: {
 			kind: 'check',
 			key: 'integrations.enabled',
-			label: l10n.t('Cloud Integrations'),
+			label: l10n.t('Integrations'),
 		},
 		controls: [
 			{
 				kind: 'integrations',
-				label: l10n.t('Cloud integrations'),
+				label: l10n.t('Integrations'),
 				// Search text — the rendered rows come from the integrations RPC service
 				hint: l10n.t('GitHub, GitHub Enterprise, GitLab, Azure DevOps, Bitbucket, Jira, Linear'),
 			},

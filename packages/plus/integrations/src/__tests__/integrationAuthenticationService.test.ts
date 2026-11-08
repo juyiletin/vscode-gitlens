@@ -1,9 +1,11 @@
 import * as assert from 'node:assert/strict';
 import { suite, test } from 'mocha';
-import { CloudIntegrationService } from '../authentication/cloudIntegrationService.js';
+import { Emitter } from '@gitlens/utils/event.js';
 import { ConfiguredIntegrationService } from '../authentication/configuredIntegrationService.js';
+import { HostIntegrationAuthenticationProvider } from '../authentication/integrationAuthenticationProvider.js';
 import { IntegrationAuthenticationService } from '../authentication/integrationAuthenticationService.js';
 import { createManualTokenAuthProvider } from '../authentication/manualTokenProvider.js';
+import type { ProviderAuthenticationSession } from '../authentication/models.js';
 import {
 	GitCloudHostIntegrationId,
 	GitSelfManagedHostIntegrationId,
@@ -11,6 +13,56 @@ import {
 } from '../constants.js';
 import type { IntegrationService } from '../integrationService.js';
 import { createFakeRuntime } from './fakeRuntime.js';
+
+suite('Persisted provider session validation', () => {
+	test('revalidates an owned session before reuse and stops serving it after external sign-out', async () => {
+		const ctx = createFakeRuntime();
+		const configured = new ConfiguredIntegrationService(ctx);
+		const auth = new IntegrationAuthenticationService(configured, ctx, () => {
+			throw new Error('Validation must not require the integration service');
+		});
+		const stored: ProviderAuthenticationSession = {
+			id: 'native-session',
+			accessToken: 'old-token',
+			account: { id: 'native-account', label: 'Native Account' },
+			scopes: ['repo'],
+			cloud: false,
+			type: undefined,
+			domain: 'github.com',
+		};
+		await configured.storeSession(GitCloudHostIntegrationId.GitHub, stored);
+		let current: ProviderAuthenticationSession | undefined = { ...stored, accessToken: 'new-token' };
+		let validations = 0;
+		const changed = new Emitter<void>();
+		const provider = new HostIntegrationAuthenticationProvider(auth, configured, GitCloudHostIntegrationId.GitHub, {
+			onDidChange: changed.event,
+			validateSession: async session => {
+				assert.strictEqual(session.account.id, stored.account.id);
+				validations++;
+				return current;
+			},
+			getSession: async () => undefined,
+			deleteSession: async () => {},
+			deleteAllSessions: async () => {},
+			dispose: () => changed.dispose(),
+		});
+		const descriptor = { domain: stored.domain, scopes: ['repo'], connectionId: stored.id, cloud: false };
+		try {
+			assert.strictEqual((await provider.getSession(descriptor))?.accessToken, 'new-token');
+			assert.strictEqual(
+				(await configured.getStoredSession(GitCloudHostIntegrationId.GitHub, descriptor))?.accessToken,
+				'new-token',
+			);
+			current = undefined;
+			assert.strictEqual(await provider.getSession(descriptor), undefined);
+			assert.strictEqual(validations, 2);
+		} finally {
+			provider.dispose();
+			auth.dispose();
+			configured.dispose();
+		}
+	});
+});
 
 /**
  * Verifies IntegrationAuthenticationService.supports (#5438): it gates whether a disconnect offers to sign
@@ -21,14 +73,8 @@ import { createFakeRuntime } from './fakeRuntime.js';
 function createAuthService(): IntegrationAuthenticationService {
 	const ctx = createFakeRuntime();
 	const configured = new ConfiguredIntegrationService(ctx);
-	const cloud = new CloudIntegrationService(ctx);
 	// supports() reads none of these collaborators, so a throwaway service getter is fine.
-	return new IntegrationAuthenticationService(
-		configured,
-		ctx,
-		() => undefined as unknown as IntegrationService,
-		cloud,
-	);
+	return new IntegrationAuthenticationService(configured, ctx, () => undefined as unknown as IntegrationService);
 }
 
 suite('IntegrationAuthenticationService.supports (#5438)', () => {

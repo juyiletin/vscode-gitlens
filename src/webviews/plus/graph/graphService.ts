@@ -26,7 +26,6 @@ import type { ReferencesQuickPickOptions2 } from '../../../quickpicks/referenceP
 import type { RunningWorktreeTask } from '../../../worktrees/worktreeTaskService.js';
 import type { ExplainResult } from '../../commitDetails/commitDetailsService.js';
 import type { SharedWebviewServices } from '../../rpc/services/common.js';
-import type { NotificationsRpcService } from '../../rpc/services/notifications.js';
 import type { RpcEventSubscription } from '../../rpc/services/types.js';
 import type { WalkthroughProgressPayload } from '../../rpc/walkthroughService.js';
 import type { GetOverviewEnrichmentResponse, GetOverviewWipResponse } from '../../shared/overviewBranches.js';
@@ -144,8 +143,6 @@ export type ResolveFileError = { filePath: string; message?: string } & Conflict
 export type ResolveAIUnavailable = {
 	/** What happened, ready to show. */
 	message: string;
-	/** `purchase-credits`: the weekly AI usage ran out and this user may buy more — offer Get More Credits. */
-	action?: 'purchase-credits';
 };
 
 /** A conflicted file the resolver couldn't auto-resolve (e.g. binary or a marker-less conflict) —
@@ -185,7 +182,7 @@ export type ResolveResult =
 			};
 	  }
 	/** `action` is set when the run failed because AI is unavailable and the panel can offer a way out. */
-	| { error: { message: string; action?: ResolveAIUnavailable['action'] } }
+	| { error: { message: string } }
 	| { cancelled: true };
 
 /** Result of re-resolving a single file with user feedback — the replacement summary for that file. */
@@ -1586,9 +1583,6 @@ export interface GraphPickersService {
 	/** Shows the repository picker and switches the graph to the chosen repo (a no-op if the user
 	 *  cancels). Used by the header's repo selector and the gate's "switch repos" affordance. */
 	chooseRepository(): Promise<void>;
-	/** Runs the `gitlens.gk.switchOrganization` command sourced from the graph. Used by the gate's
-	 *  "switch orgs" affordance. */
-	chooseAccountOrg(): Promise<void>;
 }
 
 export interface GraphPullRequestService {
@@ -1739,39 +1733,6 @@ export interface GraphStateService {
 	readonly onStateChanged: RpcEventSubscription<DidChangeParams>;
 }
 
-/** What the Send Feedback dialog submits. `type` mirrors Kepler's feedback categories so both products'
- *  feedback lands in the same warehouse series. */
-export type GraphFeedbackType = 'general' | 'feature_request' | 'bug_report';
-
-export interface GraphFeedbackInput {
-	type: GraphFeedbackType;
-	message: string;
-}
-
-export interface GraphFeedbackResult {
-	/** Whether the feedback record reached the GitKraken events intake. */
-	sent: boolean;
-	/** Whether a prefilled GitHub issue was opened (bug reports only — opened even when `sent` is false). */
-	issueOpened: boolean;
-}
-
-/** Which entry point asked for the dialog — the header account popover opens it directly, so only the
- *  VS Code title toolbar rides this event. */
-export interface DidRequestShowFeedbackParams {
-	source: 'toolbar';
-}
-
-/**
- * The Send Feedback plane. {@link GraphFeedbackService.send} is awaited end-to-end so the dialog can
- * show a real failure state; {@link GraphFeedbackService.onRequestShow} is the host's "open the
- * dialog" push for the title-toolbar command. `signal`: the toolbar is only reachable from a visible
- * graph, so there is no cold/hidden path to buffer for.
- */
-export interface GraphFeedbackService {
-	send(input: GraphFeedbackInput): Promise<GraphFeedbackResult>;
-	readonly onRequestShow: RpcEventSubscription<DidRequestShowFeedbackParams>;
-}
-
 export interface GraphServices extends SharedWebviewServices {
 	readonly access: GraphAccessService;
 	readonly avatars: GraphAvatarsService;
@@ -1781,11 +1742,9 @@ export interface GraphServices extends SharedWebviewServices {
 	readonly filters: GraphFiltersService;
 	readonly graphInspect: GraphInspectService;
 	readonly graphHealth: GraphHealthService;
-	readonly feedback: GraphFeedbackService;
 	readonly launchpad: GraphLaunchpadService;
 	readonly navigation: GraphNavigationService;
 	/** The GitKraken notifications inbox, for the header's bell */
-	readonly notifications: NotificationsRpcService;
 	readonly walkthrough: GraphWalkthroughService;
 	readonly sidebar: GraphSidebarService;
 	readonly search: GraphSearchService;

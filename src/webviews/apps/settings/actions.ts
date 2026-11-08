@@ -1,5 +1,4 @@
 import type { Remote } from '@eamodio/supertalk';
-import type { NotificationSettings } from '@gitlens/notifications/models.js';
 import type { AutolinkConfig, Config, CustomRemoteType, RemotesUrlsConfig } from '../../../config.js';
 import { isCustomConfigKey } from '../../protocol.js';
 import type { ScopedAiModelInfo } from '../../rpc/services/types.js';
@@ -123,6 +122,7 @@ export class SettingsActions {
 			for (const service of services) {
 				errors[service] = true;
 			}
+
 			s.serviceErrors.set(errors);
 		};
 
@@ -174,18 +174,6 @@ export class SettingsActions {
 			.then(progress => {
 				if (current() && progress != null) {
 					s.walkthrough.set(progress);
-				}
-			})
-			.catch(() => {});
-
-		// The notifications inbox's first paint; later changes arrive through `onNotificationsChanged`. A failure
-		// leaves it unloaded (the category stays hidden), as it is when the feature is off
-		void this.services.notifications
-			.then(async notifications => {
-				/* oxlint-disable-next-line typescript/await-thenable -- Supertalk proxy properties are thenable at runtime */
-				const state = await notifications.notificationsState;
-				if (current()) {
-					s.notifications.set(state.get());
 				}
 			})
 			.catch(() => {});
@@ -279,85 +267,6 @@ export class SettingsActions {
 		await this.refreshAiModels();
 	}
 
-	/**
-	 * Asks the host to re-fetch the GitKraken AI allowance — the Account card's Retry after it resolved
-	 * unavailable. The host owns that signal end to end: it flips it back to its loading state and
-	 * republishes, so there is nothing to set locally.
-	 *
-	 * Never rejects: the call site fires this from a click handler, so an escaping rejection would land as
-	 * an unhandled rejection. A failed retry needs no local handling either — the host publishes `null`
-	 * again, which is exactly the state the user is already looking at.
-	 */
-	async retryAiUsage(): Promise<void> {
-		try {
-			const subscription = await this.services.subscription;
-			await subscription.refreshAiUsage();
-		} catch {}
-	}
-
-	// ── Notifications ──
-	// The host applies these optimistically and publishes the new inbox state; a failed request rolls back and
-	// rejects with a presentable message for the inbox to show next to what failed.
-
-	/** Never rejects: a failed refresh keeps the cached list and publishes `status: 'error'`. */
-	async refreshNotifications(): Promise<void> {
-		try {
-			await (await this.services.notifications).refresh();
-		} catch {}
-	}
-
-	async loadMoreNotifications(): Promise<void> {
-		await (await this.services.notifications).loadMore();
-	}
-
-	async markNotificationsRead(ids: string[]): Promise<void> {
-		await (await this.services.notifications).markRead(ids);
-	}
-
-	async markNotificationsUnread(ids: string[]): Promise<void> {
-		await (await this.services.notifications).markUnread(ids);
-	}
-
-	async deleteNotifications(ids: string[]): Promise<void> {
-		await (await this.services.notifications).delete(ids);
-	}
-
-	async markAllNotificationsRead(): Promise<void> {
-		await (await this.services.notifications).markAllRead();
-	}
-
-	async deleteAllReadNotifications(): Promise<void> {
-		await (await this.services.notifications).deleteAllRead();
-	}
-
-	/** Opens the notification's call-to-action externally and marks it read. */
-	async openNotificationCta(id: string): Promise<void> {
-		await (await this.services.notifications).openCta(id);
-	}
-
-	/** Fetches the notification settings; the result is also published through the inbox state. */
-	async getNotificationSettings(): Promise<NotificationSettings> {
-		return (await this.services.notifications).getSettings();
-	}
-
-	async updateNotificationSettings(changes: Partial<NotificationSettings>): Promise<NotificationSettings> {
-		return (await this.services.notifications).updateSettings(changes);
-	}
-
-	/** Tells the host the inbox applied its focus request for `id`. Never rejects. */
-	async consumeNotificationFocus(id: string): Promise<void> {
-		try {
-			await (await this.services.notifications).consumeFocus(id);
-		} catch {}
-	}
-
-	/** Tells the host whether the inbox is on screen (it holds security/system toasts while it is). Never rejects. */
-	async setNotificationsInboxVisible(visible: boolean): Promise<void> {
-		try {
-			await (await this.services.notifications).setInboxVisible(visible);
-		} catch {}
-	}
-
 	// ── Config writes ──
 
 	/**
@@ -422,6 +331,7 @@ export class SettingsActions {
 					draftCustomSettings ??= { ...this.state.customSettings.get() };
 					draftCustomSettings[key] = value;
 				}
+
 				continue;
 			}
 
@@ -435,6 +345,7 @@ export class SettingsActions {
 		if (draftConfig != null) {
 			this.state.config.set(draftConfig);
 		}
+
 		if (draftCustomSettings != null) {
 			this.state.customSettings.set(draftCustomSettings);
 		}
@@ -624,9 +535,13 @@ export class SettingsActions {
  */
 export function coerceOptionValue(value: string): string | number | boolean | null {
 	if (value === 'true') return true;
+
 	if (value === 'false') return false;
+
 	if (value === 'null') return null;
+
 	if (value !== '' && !Number.isNaN(Number(value))) return Number(value);
+
 	return value;
 }
 
@@ -641,5 +556,6 @@ function toggleArrayMember(array: readonly string[], value: string, include: boo
 	} else if (index !== -1) {
 		result.splice(index, 1);
 	}
+
 	return result;
 }

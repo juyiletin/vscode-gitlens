@@ -244,6 +244,7 @@ export class ConfiguredIntegrationService implements Disposable {
 		if (changed) {
 			this.fireChange(descriptor.integrationId);
 		}
+
 		await this.storeConfigured();
 	}
 
@@ -266,6 +267,7 @@ export class ConfiguredIntegrationService implements Disposable {
 				if (d.primary) {
 					removedPrimaryDomains.add(d.domain);
 				}
+
 				continue;
 			}
 
@@ -325,9 +327,11 @@ export class ConfiguredIntegrationService implements Disposable {
 	private isSignedOutSince(id: IntegrationIds, session: ProviderAuthenticationSession, mark: number): boolean {
 		const since = (scope: string) => (this._signOuts.get(scope) ?? 0) > mark;
 		if (since(id)) return true;
+
 		if (isSelfManagedHostIntegrationId(id) && session.domain && since(this.getHostScope(id, session.domain))) {
 			return true;
 		}
+
 		return since(`${id}|connection:${session.id}`);
 	}
 
@@ -374,7 +378,7 @@ export class ConfiguredIntegrationService implements Disposable {
 				// so delete it from the local key and
 				// store with the "cloud" type key, and then use that one.
 				// Otherwise it's a local session under the local key, so just return it.
-				if (session.expiresAt != null) {
+				if (session.expiresAt != null && session.cloud !== false) {
 					cloudIfMissing = true;
 					try {
 						await this.deleteSecrets(id, session.id);
@@ -412,6 +416,7 @@ export class ConfiguredIntegrationService implements Disposable {
 						: id,
 				);
 			}
+
 			await this.deleteSecrets(id, this.resolveConnectionId(id, descriptor), cloud, options);
 		});
 	}
@@ -455,8 +460,10 @@ export class ConfiguredIntegrationService implements Disposable {
 					await this.ctx.storage.deleteWorkspace(`connected:${id}:${descriptor.domain}`);
 				}
 			}
+
 			changed = true;
 		}
+
 		if (!changed) return;
 
 		const remaining = Object.fromEntries(Object.entries(stored).filter(([key]) => !ids.includes(key)));
@@ -585,6 +592,7 @@ export class ConfiguredIntegrationService implements Disposable {
 				await this.deleteSecrets(id, sessionId, cloud);
 			} catch {}
 		}
+
 		return storedSession;
 	}
 
@@ -672,7 +680,7 @@ export class ConfiguredIntegrationService implements Disposable {
 	): boolean {
 		if (connectionId == null) return false;
 
-		const connection = this.getConfigured(id, { cloud: true }).find(c => c.id === connectionId);
+		const connection = this.getConfigured(id).find(c => c.id === connectionId);
 		if (connection == null) return false;
 
 		return !isSelfManagedHostIntegrationId(id) || this.domainsMatch(id, connection.domain, domain);
@@ -705,6 +713,7 @@ export class ConfiguredIntegrationService implements Disposable {
 		if (connection.id === connection.domain || (canonicalDomain && connection.id === canonicalDomain)) {
 			return undefined;
 		}
+
 		return connection.id;
 	}
 
@@ -738,6 +747,7 @@ export class ConfiguredIntegrationService implements Disposable {
 	private async setPrimaryConnectionCore(id: IntegrationIds, connectionId: string): Promise<void> {
 		const descriptors = this.configured.get(id);
 		if (descriptors == null || descriptors.length === 0) return;
+
 		if (!descriptors.some(d => d.id === connectionId)) return;
 
 		const target =
@@ -795,7 +805,9 @@ export class ConfiguredIntegrationService implements Disposable {
 
 	private domainsMatch(id: IntegrationIds, first: string | undefined, second: string | undefined): boolean {
 		if (first === second) return true;
+
 		if (!isSelfManagedHostIntegrationId(id)) return false;
+
 		if (first == null || second == null) return false;
 
 		return areDomainsOnSameHost(first, second);
@@ -814,9 +826,11 @@ export class ConfiguredIntegrationService implements Disposable {
 		if (added != null) {
 			this._addedIds.add(added);
 		}
+
 		if (removed != null) {
 			this._removedIds.add(removed);
 		}
+
 		this._fireChangeDebounced();
 	}
 }

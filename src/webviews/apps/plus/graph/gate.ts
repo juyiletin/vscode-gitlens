@@ -8,8 +8,6 @@ import type { Source } from '../../../../constants.telemetry.js';
 import type { GraphIntent } from '../../../plus/graph/protocol.js';
 import { notifyService } from '../../shared/actions/rpc.js';
 import { featureGateContentStyles } from '../../shared/components/feature-gate.css.js';
-import { subscriptionContext } from '../../shared/contexts/subscription.js';
-import type { SubscriptionContextState } from '../../shared/contexts/subscription.js';
 import { waitForFocusSettled } from '../../shared/focus.js';
 import { linkStyles } from '../shared/components/vscode.css.js';
 import { graphServicesContext, graphStateContext } from './context.js';
@@ -23,9 +21,6 @@ import '../../shared/components/gitlens-logo-circle.js';
 @customElement('gl-graph-gate')
 export class GlGraphGate extends SignalWatcher(LitElement) {
 	static override styles = [linkStyles, featureGateContentStyles];
-
-	@consume({ context: subscriptionContext, subscribe: true })
-	private _subscription!: SubscriptionContextState;
 
 	@consume({ context: graphStateContext, subscribe: false })
 	graphState!: typeof graphStateContext.__context__;
@@ -62,7 +57,6 @@ export class GlGraphGate extends SignalWatcher(LitElement) {
 	}
 
 	override render() {
-		const orgCount = this._subscription.organizationsCount.get();
 		const copy = getIntentCopy(this.intent);
 		const source: Source = { source: 'graph', detail: getIntentSourceDetail('gate', this.intent) };
 
@@ -72,11 +66,9 @@ export class GlGraphGate extends SignalWatcher(LitElement) {
 			featureRestriction="private-repos"
 			featureWithArticleIfNeeded=${l10n.t('the Commit Graph')}
 			?allowRepoSwitch=${this.graphState.allowRepoSwitch}
-			?allowOrgSwitch=${orgCount > 1}
 			.source=${source}
 			.state=${this.graphState.subscription?.state}
 			@gl-switch-repos=${this.onSwitchRepos}
-			@gl-switch-orgs=${this.onSwitchOrgs}
 		>
 			<section slot="feature" class="feature">
 				<header class="feature__header">
@@ -182,13 +174,5 @@ export class GlGraphGate extends SignalWatcher(LitElement) {
 
 		await waitForFocusSettled();
 		notifyService(services.pickers, 'pickers/chooseRepository', svc => svc.chooseRepository());
-	}
-
-	private async onSwitchOrgs(): Promise<void> {
-		const services = this._services;
-		if (services == null) return;
-
-		await waitForFocusSettled();
-		notifyService(services.pickers, 'pickers/chooseAccountOrg', svc => svc.chooseAccountOrg());
 	}
 }

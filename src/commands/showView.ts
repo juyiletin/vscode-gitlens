@@ -10,27 +10,30 @@ import type { CommandContext } from './commandContext.js';
 @command()
 export class ShowViewCommand extends GlCommandBase {
 	constructor(private readonly container: Container) {
-		super([
-			'gitlens.showAccountView',
-			'gitlens.showBranchesView',
-			'gitlens.showCommitDetailsView',
-			'gitlens.showCommitsView',
-			'gitlens.showContributorsView',
-			'gitlens.showDraftsView',
-			'gitlens.showFileHistoryView',
-			'gitlens.showGraphView',
-			'gitlens.showLaunchpadView',
-			'gitlens.showLineHistoryView',
-			'gitlens.showRemotesView',
-			'gitlens.showRepositoriesView',
-			'gitlens.showSearchAndCompareView',
-			'gitlens.showStashesView',
-			'gitlens.showTagsView',
-			'gitlens.showTimelineView',
-			'gitlens.showWelcomeView',
-			'gitlens.showWorktreesView',
-			'gitlens.showWorkspacesView',
-		]);
+		super(
+			[
+				'gitlens.showAccountView',
+				'gitlens.showBranchesView',
+				'gitlens.showCommitDetailsView',
+				'gitlens.showCommitsView',
+				'gitlens.showContributorsView',
+				'gitlens.showFileHistoryView',
+				'gitlens.showGraphView',
+				'gitlens.showLaunchpadView',
+				'gitlens.showLineHistoryView',
+				'gitlens.showRemotesView',
+				'gitlens.showRepositoriesView',
+				'gitlens.showSearchAndCompareView',
+				'gitlens.showStashesView',
+				'gitlens.showTagsView',
+				'gitlens.showTimelineView',
+				'gitlens.showWelcomeView',
+				'gitlens.showWorktreesView',
+				'gitlens.showWorkspacesView',
+			],
+			undefined,
+			{ returnResult: true },
+		);
 	}
 
 	protected override preExecute(context: CommandContext, ...args: unknown[]): Promise<void> {
@@ -84,8 +87,6 @@ export class ShowViewCommand extends GlCommandBase {
 			case 'gitlens.showContributorsView':
 				await this.waitForRepo();
 				return this.container.views.showView('contributors');
-			case 'gitlens.showDraftsView':
-				return this.container.views.showView('drafts');
 			case 'gitlens.showFileHistoryView':
 				await this.waitForRepo();
 				return this.container.views.showView('fileHistory');
@@ -121,6 +122,7 @@ export class ShowViewCommand extends GlCommandBase {
 				if (getContext('gitlens:welcome:inEditor', false)) {
 					return executeCommand('gitlens.showWelcomePage', undefined, ...args);
 				}
+
 				return this.container.views.welcome.show(undefined, ...(args as WelcomeWebviewShowingArgs));
 			case 'gitlens.showWorktreesView':
 				await this.waitForRepo();

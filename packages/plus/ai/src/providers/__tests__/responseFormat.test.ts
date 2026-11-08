@@ -3,7 +3,6 @@ import type { AIModel } from '../../models/model.js';
 import type { AIFinishReason, AIResponseFormat } from '../../models/provider.js';
 import { AnthropicProvider } from '../anthropicProvider.js';
 import { DeepSeekProvider } from '../deepSeekProvider.js';
-import { GitKrakenProvider } from '../gitkrakenProvider.js';
 import type { ChatCompletionRequest, ChatCompletionResponse } from '../openAICompatibleProviderBase.js';
 import { OpenAIProvider } from '../openaiProvider.js';
 import { OpenRouterProvider } from '../openRouterProvider.js';
@@ -212,9 +211,7 @@ suite('Anthropic response format translation', () => {
 
 suite('capability gates for dynamic and constrained providers', () => {
 	test('the base gate honors the dynamic-catalog capability flag, defaulting on when absent', () => {
-		// GitKraken/OpenRouter getModels always populate the flag (GitKraken fails closed for
-		// non-OpenAI/Gemini upstreams there); static registries flag only legacy entries
-		const provider = hooks(new GitKrakenProvider(context));
+		const provider = hooks(new OpenRouterProvider(context));
 
 		assert.strictEqual(provider.supportsResponseFormat(model('gpt-4o', { supportsStructuredOutputs: true })), true);
 		assert.strictEqual(
@@ -264,24 +261,5 @@ suite('native-format rejection detection (strip-and-retry trigger)', () => {
 		assert.strictEqual(provider.isResponseFormatRejection(400, 'context_length_exceeded'), false);
 		assert.strictEqual(provider.isResponseFormatRejection(404, 'No endpoints found matching your request'), true);
 		assert.strictEqual(provider.isResponseFormatRejection(500, 'internal error'), false);
-	});
-
-	test('GitKraken also detects its 500.1 wrapper around an upstream 400 (e.g. the Gemini schema converter)', () => {
-		const provider = hooks(new GitKrakenProvider(context));
-
-		assert.strictEqual(
-			provider.isResponseFormatRejection(
-				500,
-				'{"error":{"code":"500.1","message":"upstream AI provider error (Gemini HTTP 400)"}}',
-			),
-			true,
-		);
-		// Transient upstream failures are not format rejections
-		assert.strictEqual(
-			provider.isResponseFormatRejection(500, 'upstream AI provider error (Gemini HTTP 503)'),
-			false,
-		);
-		// Still honors the base's own 400 detection
-		assert.strictEqual(provider.isResponseFormatRejection(400, 'invalid response_format'), true);
 	});
 });

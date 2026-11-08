@@ -1,5 +1,4 @@
 import * as l10n from '@vscode/l10n';
-import type { TemplateResult } from 'lit';
 import { css, html, LitElement, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
@@ -21,8 +20,6 @@ import { isConflictStatus } from '@gitlens/git/utils/fileStatus.utils.js';
 import { getNumericFormat } from '@gitlens/utils/date.js';
 import { formatPlural } from '@gitlens/utils/plural.js';
 import type { ViewFilesLayout } from '../../../../../config.js';
-import type { Source } from '../../../../../constants.telemetry.js';
-import { createCommandLink } from '../../../../../system/commands.js';
 import { getWipFileWebviewItem, serializeWebviewItemContext } from '../../../../../system/webview.js';
 import type { DetailsItemTypedContext } from '../../../../plus/graph/detailsProtocol.js';
 import { buildFolderContext } from '../../../../plus/graph/detailsProtocol.js';
@@ -101,9 +98,12 @@ const conflictKindDisplay: Record<ConflictKind, { label: string; icon: string }>
 function kindDisplay(kind: ConflictKind | undefined, status?: GitFileConflictStatus): { label: string; icon: string } {
 	if (kind === 'add-add') {
 		if (status === 'AU') return { label: l10n.t('Added (current)'), icon: 'diff-added' };
+
 		if (status === 'UA') return { label: l10n.t('Added (incoming)'), icon: 'diff-added' };
+
 		return { label: l10n.t('Both added'), icon: 'diff-added' };
 	}
+
 	return kind != null ? conflictKindDisplay[kind] : { label: l10n.t('Needs review'), icon: 'warning' };
 }
 
@@ -600,7 +600,6 @@ export class GlDetailsResolveModePanel extends LitElement {
 	@property({ attribute: 'status' }) status: ResolveModeStatus = 'idle';
 	@property() errorMessage?: string;
 	/** Call to action for the `error` state — set when the run failed because AI is unavailable. */
-	@property() errorAction?: ResolveAIUnavailable['action'];
 	/** AI became unavailable after some files were resolved — rendered once above the results. */
 	@property({ type: Object }) aiUnavailable?: ResolveAIUnavailable;
 	@property({ type: Array }) resolutions?: readonly ResolvedFileSummary[];
@@ -683,6 +682,7 @@ export class GlDetailsResolveModePanel extends LitElement {
 				checked.add(f.path);
 			}
 		}
+
 		return checked;
 	}
 
@@ -712,7 +712,9 @@ export class GlDetailsResolveModePanel extends LitElement {
 	/** Effective checked state = the default, overridden by the user's explicit check/uncheck delta. */
 	private isChecked(path: string): boolean {
 		if (this._userChecked.has(path)) return true;
+
 		if (this._userUnchecked.has(path)) return false;
+
 		return this.isCheckedByDefault(path);
 	}
 
@@ -776,6 +778,7 @@ export class GlDetailsResolveModePanel extends LitElement {
 					for (const step of steps.slice(seen)) {
 						next.add(`auto-rebase-step-${step.step}`);
 					}
+
 					this._collapsedSections = next;
 				}
 			}
@@ -803,6 +806,7 @@ export class GlDetailsResolveModePanel extends LitElement {
 			if (checked != null) {
 				this._userChecked = checked;
 			}
+
 			const unchecked = prunePathsToFiles(this._userUnchecked, this.conflictedFiles);
 			if (unchecked != null) {
 				this._userUnchecked = unchecked;
@@ -855,7 +859,6 @@ export class GlDetailsResolveModePanel extends LitElement {
 					l10n.t('An error occurred while resolving conflicts.'),
 					'resolve-error-retry',
 					'resolve-error-back',
-					this.renderAIUnavailableAction(this.errorAction),
 				);
 			case 'ready':
 				return this.renderReady();
@@ -1149,6 +1152,7 @@ export class GlDetailsResolveModePanel extends LitElement {
 			cached = { layout: this.fileLayout };
 			this._paneFilesLayout = cached;
 		}
+
 		return cached;
 	}
 
@@ -1234,6 +1238,7 @@ export class GlDetailsResolveModePanel extends LitElement {
 		for (const path of e.detail.paths) {
 			this.applyChecked(path, e.detail.checked, checked, unchecked);
 		}
+
 		this._userChecked = checked;
 		this._userUnchecked = unchecked;
 	}
@@ -1262,9 +1267,11 @@ export class GlDetailsResolveModePanel extends LitElement {
 			if (canStageCurrent(conflictStatus)) {
 				modifiers.push('+canStageCurrent');
 			}
+
 			if (canStageIncoming(conflictStatus)) {
 				modifiers.push('+canStageIncoming');
 			}
+
 			webviewItem = `gitlens:file${modifiers.join('')}`;
 		} else {
 			webviewItem = getWipFileWebviewItem(file);
@@ -1507,6 +1514,7 @@ export class GlDetailsResolveModePanel extends LitElement {
 		} else {
 			next.add(key);
 		}
+
 		this._collapsedSections = next;
 	}
 
@@ -1517,6 +1525,7 @@ export class GlDetailsResolveModePanel extends LitElement {
 		} else {
 			next.add(filePath);
 		}
+
 		this._openReasons = next;
 	}
 
@@ -1617,6 +1626,7 @@ export class GlDetailsResolveModePanel extends LitElement {
 		} else {
 			next.add(filePath);
 		}
+
 		this._expandedRetry = next;
 	}
 
@@ -1658,24 +1668,8 @@ export class GlDetailsResolveModePanel extends LitElement {
 					)}</span
 				>
 				<span>${notice.message}</span>
-				${this.renderAIUnavailableAction(notice.action)}
 			</div>
 		</div>`;
-	}
-
-	private renderAIUnavailableAction(action: ResolveAIUnavailable['action']): TemplateResult | undefined {
-		if (action !== 'purchase-credits') return undefined;
-
-		return html`<gl-button
-			class="resolve-unavailable__action"
-			appearance="secondary"
-			href=${createCommandLink<Source>('gitlens.ai.purchaseCredits', {
-				source: 'graph',
-				detail: { location: 'graph-details:resolve' },
-			})}
-			>${l10n.t('Get More Credits')}
-			<code-icon icon="link-external" slot="suffix" aria-hidden="true"></code-icon>
-		</gl-button>`;
 	}
 
 	/** Builds the "Needs your input" list. Each rename/rename pair (both target paths share the same
@@ -1813,6 +1807,7 @@ export class GlDetailsResolveModePanel extends LitElement {
 		if (file.canStageCurrent) {
 			buttons.push(this.renderTakeSideButton(file.filePath, 'current', status, staging));
 		}
+
 		if (file.canStageIncoming) {
 			buttons.push(this.renderTakeSideButton(file.filePath, 'incoming', status, staging));
 		}

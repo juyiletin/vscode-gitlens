@@ -5,7 +5,7 @@
 // sub-package's `exports` under a dest subpath, and its `dependencies` are wholly derived from the
 // sub-packages. Nothing but `dist/` ships: its source maps carry the sources themselves.
 
-import { rm } from 'node:fs/promises';
+import { readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
 	bundleWorkspacePackages,
@@ -35,3 +35,20 @@ await bundleWorkspacePackages({
 		manifest.imports = await generateBundledImports(repoRoot, packages);
 	},
 });
+
+// Const enum inlining can leave bare imports in preserveModules output. All packages bundled into Core
+// declare sideEffects: false, so those internal imports carry no initialization contract. Remove them
+// from the published artifact while keeping external imports and generated source-map positions intact.
+const dist = join(coreRoot, 'dist');
+for (const file of await readdir(dist, { recursive: true })) {
+	if (!file.endsWith('.js')) continue;
+
+	const path = join(dist, file);
+	const contents = await readFile(path, 'utf8');
+	const updated = contents.replace(/^import\s+(['"])\.[^'"\r\n]+\.js\1;?[\t ]*$/gm, statement =>
+		statement.replace(/[^\r\n]/g, ' '),
+	);
+	if (updated !== contents) {
+		await writeFile(path, updated);
+	}
+}

@@ -36,7 +36,6 @@ import {
 import { Emitter } from '@gitkraken/core-gitlens/utils/event.js';
 import { Logger } from '@gitkraken/core-gitlens/utils/logger.js';
 import { PromiseCache } from '@gitkraken/core-gitlens/utils/promiseCache.js';
-import type { Uri } from '@gitkraken/core-gitlens/utils/uri.js';
 
 // Keep the README's representative imports part of this package-level compile contract.
 type DocumentedCoreExports = [
@@ -120,9 +119,6 @@ function buildRuntime(): IntegrationManagerContext {
 			onDidCheckIn: new Emitter<{ force?: boolean }>().event,
 			onDidChangeSessions: new Emitter<{ provider: { id: string } }>().event,
 			isTrialOrPaid: async () => false,
-			fetchGkApi: () => {
-				throw new Error('not implemented in fixture');
-			},
 			connect: async () => false,
 			openManagement: async () => false,
 		},
@@ -179,6 +175,7 @@ async function main(): Promise<void> {
 			// @ts-expect-error A self-managed hierarchy selector is ambiguous without its provider.
 			void manager.listProjects({ domain: 'ghe.example.com' });
 		}
+
 		manager.dispose();
 	});
 
@@ -196,21 +193,35 @@ async function main(): Promise<void> {
 			type: 'pat',
 			domain: 'https://jira.example.com/jira',
 		};
-		runtime.account.getAccount = async () => ({ id: 'me' });
-		runtime.account.fetchGkApi = async path =>
-			new Response(
-				JSON.stringify({
-					data:
-						path === 'v1/provider-tokens'
-							? [connection]
-							: {
-									...connection,
-									accessToken: 'test-pat',
-									expiresIn: 3600,
-									scopes: '',
-								},
-				}),
-			);
+		const hooks = runtime.hooks!;
+		hooks.getConnections = async () => [
+			{
+				id: 'dc',
+				provider: 'jiraServer',
+				type: 'pat',
+				domain: connection.domain,
+				primary: true,
+				accountName: 'person',
+			},
+		];
+		hooks.createAuthenticationProvider = async () => ({
+			persistSessions: true,
+			onDidChange: new Emitter<void>().event,
+			getSession: async descriptor => ({
+				id: descriptor.connectionId || 'dc',
+				accessToken: 'test-pat',
+				scopes: [],
+				cloud: true,
+				type: 'pat',
+				domain: 'jira.example.com',
+				baseUrl: connection.domain,
+				account: { id: 'person', label: 'person' },
+			}),
+			deleteSession: async () => {},
+			deleteAllSessions: async () => {},
+			dispose: () => {},
+		});
+
 		runtime.http.fetch = async input => {
 			assert.equal(input.toString(), 'https://jira.example.com/jira/rest/api/2/project');
 			return new Response(JSON.stringify([{ id: '100', key: 'PROJ', name: 'Project' }]), {
@@ -243,30 +254,36 @@ async function main(): Promise<void> {
 
 	await check('consumer reads the Linear workspace from each connection without hierarchy reads', async () => {
 		const runtime = buildRuntime();
-		runtime.account.getAccount = async () => ({ id: 'me' });
-		const linearConnection = (tokenId: string) => ({
-			tokenId: tokenId,
-			provider: 'linear',
-			type: 'oauth',
-			domain: 'linear.app',
-			accountName: 'person',
+		const hooks = runtime.hooks!;
+		hooks.getConnections = async () =>
+			['one', 'two'].map((id, index) => ({
+				id: id,
+				provider: 'linear' as const,
+				type: 'oauth' as const,
+				domain: 'linear.app',
+				primary: index === 0,
+				accountName: 'person',
+			}));
+		hooks.createAuthenticationProvider = async () => ({
+			persistSessions: true,
+			onDidChange: new Emitter<void>().event,
+			getSession: async descriptor => {
+				const id = descriptor.connectionId || 'one';
+				return {
+					id: id,
+					accessToken: `token-${id}`,
+					scopes: ['read'],
+					cloud: true,
+					type: 'oauth',
+					domain: 'linear.app',
+					account: { id: 'person', label: 'person' },
+				};
+			},
+			deleteSession: async () => {},
+			deleteAllSessions: async () => {},
+			dispose: () => {},
 		});
-		runtime.account.fetchGkApi = async path =>
-			new Response(
-				JSON.stringify({
-					data:
-						path === 'v1/provider-tokens'
-							? [{ ...linearConnection('one'), secondaries: [linearConnection('two')] }]
-							: {
-									tokenId: path.split('/').pop(),
-									accessToken: `token-${path.split('/').pop()}`,
-									expiresIn: 3600,
-									type: 'oauth',
-									scopes: 'read',
-								},
-				}),
-				{ status: 200 },
-			);
+
 		const authorizations: (string | null)[] = [];
 		runtime.http.fetch = async (_url, init) => {
 			const authorization = new Headers(init?.headers).get('authorization');
@@ -341,8 +358,10 @@ async function main(): Promise<void> {
 	if (failures.length > 0) {
 		console.error(`FAIL — ${failures.length} check(s) failed:`);
 		for (const f of failures) console.error(`  • ${f}`);
+
 		process.exit(1);
 	}
+
 	console.log('PASS — public boundary holds for an external consumer.');
 }
 

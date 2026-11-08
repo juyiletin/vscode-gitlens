@@ -29,15 +29,8 @@ import { SyncedStorageKeys } from './constants.storage.js';
 import { Container } from './container.js';
 import { setFeatureFlagTelemetryGlobalAttributes } from './featureFlags/featureFlagService.js';
 import { isGitUri } from './git/gitUri.js';
-import {
-	showCursorMcpCleanupMessage,
-	showDebugLoggingWarningMessage,
-	showMcpMessage,
-	showPreReleaseExpiredErrorMessage,
-	showWhatsNewMessage,
-} from './messages.js';
+import { showDebugLoggingWarningMessage, showPreReleaseExpiredErrorMessage, showWhatsNewMessage } from './messages.js';
 import { registerPartnerActionRunners } from './partners.js';
-import { needsCursorMcpCleanupNotice } from './plus/gk/utils/-webview/mcp.utils.js';
 import { registerResourceUsage } from './resourceUsage.js';
 import { settingsMigrations } from './settingsMigrations.js';
 import { executeCommand, executeCoreCommand, registerCommands } from './system/-webview/command.js';
@@ -68,6 +61,7 @@ export async function activate(context: ExtensionContext): Promise<GitLensApi | 
 						'To enable debug logging, run "GitLens: Enable Debug Logging" or "Developer: Set Log Level..." from the Command Palette',
 					);
 				}
+
 				return channel;
 			},
 			toLoggable: function (o: any) {
@@ -76,7 +70,9 @@ export async function activate(context: ExtensionContext): Promise<GitLensApi | 
 						o.sha ? ` sha=${o.sha}` : ''
 					})`;
 				}
+
 				if (o instanceof Uri) return `Uri(${o.toString(true)})`;
+
 				if (isLoggable(o)) return o.toLoggable();
 
 				if ('rootUri' in o && o.rootUri instanceof Uri) {
@@ -225,7 +221,6 @@ export async function activate(context: ExtensionContext): Promise<GitLensApi | 
 		}
 
 		void showWhatsNew(container, gitlensVersion, prerelease, previousVersion);
-		showMcp(container, gitlensVersion, previousVersion);
 		void applyPendingLegacyViewHiding(container);
 
 		void storage.store(prerelease ? 'preVersion' : 'version', gitlensVersion).catch();
@@ -373,7 +368,7 @@ async function applyPendingLegacyViewHiding(container: Container): Promise<void>
 		// A `when` that never comes true isn't showing its view anyway — the common case (no drafts
 		// entitlement) burns the full budget for it; accepted, this runs voided off the critical path,
 		// once per install.
-		let remaining: ('drafts' | 'workspaces')[] = ['drafts', 'workspaces'];
+		let remaining: 'workspaces'[] = ['workspaces'];
 		const deadline = Date.now() + 15000;
 		while (remaining.length) {
 			const cmds = await commands.getCommands(true);
@@ -398,6 +393,7 @@ async function applyPendingLegacyViewHiding(container: Container): Promise<void>
 						`applyPendingLegacyViewHiding: skipped '${remaining.join("', '")}' (never registered)`,
 					);
 				}
+
 				break;
 			}
 
@@ -562,23 +558,4 @@ async function showWhatsNew(
 			container.context.subscriptions.push(disposable);
 		}
 	}
-}
-
-function showMcp(container: Container, version: string, previousVersion: string | undefined): void {
-	if (needsCursorMcpCleanupNotice(container)) {
-		void showCursorMcpCleanupMessage();
-		return;
-	}
-
-	if (
-		isWeb ||
-		previousVersion == null ||
-		version === previousVersion ||
-		compare(version, previousVersion) !== 1 ||
-		satisfies(fromString(previousVersion), '>= 17.5')
-	) {
-		return;
-	}
-
-	void showMcpMessage(container, version);
 }

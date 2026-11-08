@@ -136,6 +136,7 @@ export class AutoRebaseService implements Disposable {
 			active.cts.cancel();
 			active.cts.dispose();
 		}
+
 		this._sessions.clear();
 		this._onDidChange.dispose();
 	}
@@ -219,6 +220,7 @@ export class AutoRebaseService implements Disposable {
 		} catch (ex) {
 			this.fail(active, ex);
 		}
+
 		return session;
 	}
 
@@ -230,6 +232,7 @@ export class AutoRebaseService implements Disposable {
 		if (status?.type !== 'rebase') {
 			throw new Error(l10n.t('No rebase is in progress.'));
 		}
+
 		if (!status.isPaused) {
 			throw new Error(l10n.t('The rebase is not paused.'));
 		}
@@ -287,6 +290,7 @@ export class AutoRebaseService implements Disposable {
 		} catch (ex) {
 			this.fail(active, ex);
 		}
+
 		return session;
 	}
 
@@ -310,6 +314,7 @@ export class AutoRebaseService implements Disposable {
 		if (status?.type !== 'rebase') {
 			throw new Error(l10n.t('No rebase is in progress.'));
 		}
+
 		if (status.hasStarted) {
 			throw new Error(
 				status.isPaused
@@ -377,6 +382,7 @@ export class AutoRebaseService implements Disposable {
 		} catch (ex) {
 			this.fail(active, ex);
 		}
+
 		return session;
 	}
 
@@ -563,6 +569,7 @@ export class AutoRebaseService implements Disposable {
 		} catch (ex) {
 			this.fail(active, ex);
 		}
+
 		return session;
 	}
 
@@ -602,6 +609,7 @@ export class AutoRebaseService implements Disposable {
 		if (mode === 'detach') {
 			active.detachRequested = true;
 		}
+
 		active.cts.cancel();
 	}
 
@@ -624,6 +632,7 @@ export class AutoRebaseService implements Disposable {
 		if (record == null) {
 			return { ok: false, reason: 'no-record', message: l10n.t('There is no Auto-Rebase to undo.') };
 		}
+
 		return this.validateUndo(this.container.git.getRepositoryService(repoPath), record);
 	}
 
@@ -648,6 +657,7 @@ export class AutoRebaseService implements Disposable {
 		} else {
 			this.container.telemetry.sendEvent('autoRebase/undo/refused', { reason: result.reason });
 		}
+
 		return result;
 	}
 
@@ -691,6 +701,7 @@ export class AutoRebaseService implements Disposable {
 					} else {
 						popAfterReset = true;
 					}
+
 					break;
 				case 'discard':
 					// Only safe when the dirtiness is the conflicted application of an autostash
@@ -735,12 +746,6 @@ export class AutoRebaseService implements Disposable {
 
 		const active = this._sessions.get(repoPath);
 		if (active == null || runningPhases.has(active.session.phase)) return;
-
-		// An escalated session whose handoff was never consumed still owns its AI conversation —
-		// flush it so BYOK usage is reported (a consumed handoff transfers that to the panel).
-		if (active.session.phase === 'escalated' && active.handoff != null) {
-			void this.container.ai.flushBYOKUsage(active.session.id);
-		}
 
 		this._sessions.delete(repoPath);
 		active.cts.dispose();
@@ -860,6 +865,7 @@ export class AutoRebaseService implements Disposable {
 					active.source,
 				);
 			}
+
 			this.fireChange(active.session);
 		};
 
@@ -899,6 +905,7 @@ export class AutoRebaseService implements Disposable {
 				} else {
 					await this.handleCancelled(svc, active);
 				}
+
 				break;
 			case 'escalated':
 				active.session.escalation = result.escalation;
@@ -948,7 +955,6 @@ export class AutoRebaseService implements Disposable {
 			session.phase = 'aborted';
 			clearTransientProgress(session);
 			this.fireChange(session);
-			void this.container.ai.flushBYOKUsage(session.id);
 			return;
 		}
 
@@ -997,7 +1003,6 @@ export class AutoRebaseService implements Disposable {
 			active.source,
 		);
 		this.fireChange(session);
-		void this.container.ai.flushBYOKUsage(session.id);
 	}
 
 	private async handleCancelled(svc: GitRepositoryService, active: ActiveAutoRebase): Promise<void> {
@@ -1044,7 +1049,6 @@ export class AutoRebaseService implements Disposable {
 		clearTransientProgress(session);
 		this.container.telemetry.sendEvent('autoRebase/cancelled', this.lifecycleData(session), active.source);
 		this.fireChange(session);
-		void this.container.ai.flushBYOKUsage(session.id);
 	}
 
 	private fail(active: ActiveAutoRebase, ex: unknown): void {
@@ -1057,7 +1061,6 @@ export class AutoRebaseService implements Disposable {
 		clearTransientProgress(session);
 		this.container.telemetry.sendEvent('autoRebase/failed', this.lifecycleData(session), active.source);
 		this.fireChange(session);
-		void this.container.ai.flushBYOKUsage(session.id);
 	}
 
 	private sendEscalatedEvent(active: ActiveAutoRebase): void {
@@ -1150,11 +1153,6 @@ export class AutoRebaseService implements Disposable {
 	/** Registers a new session for its repo, invalidating any previous terminal session + undo record. */
 	private trackSession(session: AutoRebaseSession, source: Source): ActiveAutoRebase {
 		const previous = this._sessions.get(session.repoPath);
-		// An escalated session being replaced still owns its AI conversation if its handoff was never
-		// consumed — flush its BYOK usage before dropping it (matching dismiss()).
-		if (previous?.session.phase === 'escalated' && previous.handoff != null) {
-			void this.container.ai.flushBYOKUsage(previous.session.id);
-		}
 		previous?.cts.dispose();
 		// A new run invalidates the previous run's rollback point
 		void this.container.storage.deleteWorkspace(this.undoStorageKey(session.repoPath));
@@ -1289,5 +1287,6 @@ function sumOf<T>(items: readonly T[], get: (item: T) => number | undefined): nu
 
 		total = (total ?? 0) + value;
 	}
+
 	return total;
 }

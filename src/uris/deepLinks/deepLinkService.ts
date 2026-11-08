@@ -11,7 +11,6 @@ import { createReference } from '@gitlens/git/utils/reference.utils.js';
 import { parseGitRemoteUrl } from '@gitlens/git/utils/remote.utils.js';
 import { isSha } from '@gitlens/git/utils/revision.utils.js';
 import { isIntegrationId, isSupportedCloudIntegrationId } from '@gitlens/integrations/constants.js';
-import { base64, fromBase64ToString } from '@gitlens/utils/base64.js';
 import { trace } from '@gitlens/utils/decorators/log.js';
 import { once } from '@gitlens/utils/event.js';
 import { getBranchNameWithoutRemote } from '@gitlens/utils/gitRefs.js';
@@ -21,7 +20,6 @@ import { maybeUri, normalizePath } from '@gitlens/utils/path.js';
 import type { Deferred } from '@gitlens/utils/promise.js';
 import { defer } from '@gitlens/utils/promise.js';
 import type { OpenChatActionCommandArgs } from '../../commands/openChatAction.js';
-import type { OpenCloudPatchCommandArgs } from '../../commands/patches.js';
 import type { StoredDeepLinkContext, StoredNamedRef } from '../../constants.storage.js';
 import type { Source } from '../../constants.telemetry.js';
 import type { Container } from '../../container.js';
@@ -435,6 +433,7 @@ export class DeepLinkService implements Disposable {
 		} catch {
 			Logger.warn(scope, `Failed to parse pending deep link PR data: ${pendingDeepLink.prData}`);
 		}
+
 		try {
 			this._context.issueData =
 				pendingDeepLink.issueData != null ? JSON.parse(pendingDeepLink.issueData) : undefined;
@@ -532,6 +531,7 @@ export class DeepLinkService implements Disposable {
 	private async getShaForCommit(targetId: string): Promise<string | undefined> {
 		const { repo } = this._context;
 		if (!repo) return undefined;
+
 		if (await repo.git.refs.isValidReference(targetId)) {
 			return targetId;
 		}
@@ -548,6 +548,7 @@ export class DeepLinkService implements Disposable {
 
 		const sha2 = await this.getRefSha(secondaryTargetId);
 		if (sha2 == null) return undefined;
+
 		return [sha1, sha2];
 	}
 
@@ -573,6 +574,7 @@ export class DeepLinkService implements Disposable {
 
 	private async getTargetRef(ref: string): Promise<GitReference | undefined> {
 		if (ref === '') return undefined;
+
 		if (isSha(ref)) return this.getCommit(ref);
 
 		const normalized = ref.toLocaleLowerCase();
@@ -590,6 +592,7 @@ export class DeepLinkService implements Disposable {
 	private async getShasForTargets(): Promise<string | string[] | undefined> {
 		const { repo, targetType, targetId, secondaryTargetId } = this._context;
 		if (repo == null || targetType === DeepLinkType.Repository || targetId == null) return undefined;
+
 		if (targetType === DeepLinkType.Branch) {
 			return this.getShaForBranch(targetId);
 		}
@@ -608,6 +611,7 @@ export class DeepLinkService implements Disposable {
 
 		if (targetType === DeepLinkType.Comparison) {
 			if (secondaryTargetId == null) return undefined;
+
 			return this.getShasForComparison(targetId, secondaryTargetId);
 		}
 
@@ -697,7 +701,9 @@ export class DeepLinkService implements Disposable {
 			value: getMaybeRemoteNameFromRemoteUrl(remoteUrl),
 			validateInput: value => {
 				if (!value) return l10n.t('A name is required');
+
 				if (existingRemoteNames.includes(value)) return l10n.t('A remote with that name already exists');
+
 				return undefined;
 			},
 		});
@@ -873,6 +879,7 @@ export class DeepLinkService implements Disposable {
 						message = 'No link type provided.';
 						break;
 					}
+
 					if (!AccountDeepLinkTypes.includes(targetType)) {
 						action = DeepLinkServiceAction.AccountCheckPassed;
 						break;
@@ -902,6 +909,7 @@ export class DeepLinkService implements Disposable {
 						message = 'No link type provided.';
 						break;
 					}
+
 					if (!PaidDeepLinkTypes.includes(targetType)) {
 						action = DeepLinkServiceAction.PlanCheckPassed;
 						break;
@@ -1076,6 +1084,7 @@ export class DeepLinkService implements Disposable {
 							openDialogTitle = l10n.t('Choose a folder to open the repository');
 							break;
 					}
+
 					this._context.repoOpenUri ??= (
 						await window.showOpenDialog({
 							title: openDialogTitle,
@@ -1321,6 +1330,7 @@ export class DeepLinkService implements Disposable {
 							action = DeepLinkServiceAction.DeepLinkErrored;
 							message = `No matching ${targetSha == null ? 'target' : 'secondary target'} found.`;
 						}
+
 						break;
 					}
 
@@ -1373,6 +1383,7 @@ export class DeepLinkService implements Disposable {
 					} else {
 						action = DeepLinkServiceAction.RepoOpened;
 					}
+
 					break;
 				}
 				case DeepLinkServiceState.RepoOpening: {
@@ -1403,6 +1414,7 @@ export class DeepLinkService implements Disposable {
 						} else {
 							action = DeepLinkServiceAction.OpenGraph;
 						}
+
 						break;
 					}
 
@@ -1428,8 +1440,10 @@ export class DeepLinkService implements Disposable {
 							} else {
 								action = DeepLinkServiceAction.OpenGraph;
 							}
+
 							break;
 					}
+
 					break;
 				}
 				case DeepLinkServiceState.OpenGraph: {
@@ -1491,25 +1505,8 @@ export class DeepLinkService implements Disposable {
 					break;
 				}
 				case DeepLinkServiceState.OpenDraft: {
-					if (!targetId) {
-						action = DeepLinkServiceAction.DeepLinkErrored;
-						message = 'Missing cloud patch id.';
-						break;
-					}
-
-					const type = this._context.params?.get('type');
-					let prEntityId = this._context.params?.get('prEntityId') ?? undefined;
-					if (prEntityId != null) {
-						prEntityId = fromBase64ToString(prEntityId);
-					}
-
-					void (await executeCommand<OpenCloudPatchCommandArgs>('gitlens.openCloudPatch', {
-						type: type === 'suggested_pr_change' ? 'code_suggestion' : 'patch',
-						id: targetId,
-						patchId: secondaryTargetId,
-						prEntityId: prEntityId,
-					}));
-					action = DeepLinkServiceAction.DeepLinkResolved;
+					action = DeepLinkServiceAction.DeepLinkErrored;
+					message = l10n.t('Cloud Patches are not available in this fork.');
 					break;
 				}
 				case DeepLinkServiceState.OpenWorkspace: {
@@ -1581,6 +1578,7 @@ export class DeepLinkService implements Disposable {
 							.getRepositoryService(repoPath ?? repo.uri.fsPath)
 							.getRevisionUri(targetSha, filePath);
 					} catch {}
+
 					if (revisionUri == null) {
 						action = DeepLinkServiceAction.DeepLinkErrored;
 						message = 'Unable to get revision uri.';
@@ -1706,6 +1704,7 @@ export class DeepLinkService implements Disposable {
 					} else {
 						action = DeepLinkServiceAction.DeepLinkResolved;
 					}
+
 					break;
 				}
 				case DeepLinkServiceState.OpenWorkingChanges: {
@@ -1751,6 +1750,7 @@ export class DeepLinkService implements Disposable {
 						} else {
 							message = 'No pull request refs was provided.';
 						}
+
 						break;
 					}
 
@@ -1866,6 +1866,7 @@ export class DeepLinkService implements Disposable {
 						if (id === 'github-enterprise' || id === 'gitlab-self-hosted') {
 							return `cloud-${id}`;
 						}
+
 						return id;
 					});
 
@@ -1932,6 +1933,7 @@ export class DeepLinkService implements Disposable {
 						// oxlint-disable-next-line @gitlens/no-raw-error-message -- log only
 						message = `Failed to start review: ${ex instanceof Error ? ex.message : String(ex)}`;
 					}
+
 					break;
 				}
 				case DeepLinkServiceState.StartWork: {
@@ -1959,6 +1961,7 @@ export class DeepLinkService implements Disposable {
 						// oxlint-disable-next-line @gitlens/no-raw-error-message -- log only
 						message = `Failed to start work: ${ex instanceof Error ? ex.message : String(ex)}`;
 					}
+
 					break;
 				}
 
@@ -2019,7 +2022,9 @@ export class DeepLinkService implements Disposable {
 		compareWithRef?: StoredNamedRef,
 	): Promise<URL> {
 		if (remoteUrl == null && typeof refOrIdOrRepoPath === 'string') {
-			return this.getRedirectUrl(`workspaces/${refOrIdOrRepoPath}`);
+			return new URL(
+				`${this.getDeepLinkScheme()}://${this.container.context.extension.id}/link/workspaces/${encodeURIComponent(refOrIdOrRepoPath)}`,
+			);
 		}
 
 		let targetType: DeepLinkType | undefined;
@@ -2077,7 +2082,7 @@ export class DeepLinkService implements Disposable {
 			deepLink.searchParams.set('url', remoteUrl);
 		}
 
-		return this.getRedirectUrl(encodeURIComponent(base64(deepLink.href)));
+		return deepLink;
 	}
 
 	async generateFileDeepLinkUr(
@@ -2131,23 +2136,18 @@ export class DeepLinkService implements Disposable {
 			}
 		}
 
-		return this.getRedirectUrl(encodeURIComponent(base64(deepLink.href)));
+		return deepLink;
 	}
 
 	private getDeepLinkScheme(): string {
 		const schemeOverride = configuration.get('deepLinks.schemeOverride');
 		return !schemeOverride ? 'vscode' : schemeOverride === true ? env.uriScheme : schemeOverride;
 	}
-
-	private getRedirectUrl(path: string): URL {
-		const url = new URL(`link/${path}`, this.container.urls.baseGkDevUri.toString());
-		url.searchParams.set('origin', 'gitlens');
-		return url;
-	}
 }
 
 export function getMaybeRemoteNameFromRemoteUrl(remoteUrl: string): string | undefined {
 	const remoteUrlParts = remoteUrl.split('/');
 	if (remoteUrlParts.length < 3) return undefined;
+
 	return remoteUrlParts[remoteUrlParts.length - 2];
 }

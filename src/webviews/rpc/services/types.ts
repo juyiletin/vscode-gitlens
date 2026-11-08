@@ -4,13 +4,11 @@
  * These are serializable data shapes used by multiple service interfaces.
  * Keep this file to pure type definitions — no runtime code.
  */
-
 import type { GitTrackingUpstream } from '@gitlens/git/models/branch.js';
 import type { GitDiffFileStats } from '@gitlens/git/models/diff.js';
 import type { GitFileChangeShape, GitFileChangeStats } from '@gitlens/git/models/fileChange.js';
 import type { GitPausedOperationStatus } from '@gitlens/git/models/pausedOperationStatus.js';
 import type { RepositoryChange } from '@gitlens/git/models/repository.js';
-import type { GkNotification, NotificationSettings, NotificationsStatus } from '@gitlens/notifications/models.js';
 import type { Source, TelemetryEventData, TelemetryEvents } from '../../../constants.telemetry.js';
 import type { AIModelScope } from '../../../plus/ai/aiProviderService.js';
 
@@ -213,62 +211,6 @@ export interface AIState {
 	 * detection fails, the persisted id is kept unverified, labelled by the id itself.
 	 */
 	readonly defaultAgent: { readonly id: string; readonly label: string } | undefined;
-}
-
-/**
- * GitKraken AI weekly usage standing (allowance, consumption, reset). `limit === -1` means unlimited,
- * `limit === 0` means no allowance — never conflate the two.
- */
-export interface AiUsageInfo {
-	readonly limit: number;
-	readonly used: number;
-	readonly resetsOn: string;
-	/**
-	 * The organization's shared pool rollup, when the backend reports a usable one — 20% of every seat's
-	 * weekly allowance funds it, which is why `limit` above reads below the plan's stated per-week figure.
-	 * Same sentinels as `limit`.
-	 */
-	readonly organization?: { readonly used: number; readonly limit: number };
-	/**
-	 * This user's own consumption drawn from the shared organization pool — the slice of
-	 * `organization.used` attributable to the current account, NOT a separate allowance and NOT part of
-	 * `used` above. Lets the pool's bar separate this user's draw from the rest of the organization's.
-	 */
-	readonly sharedUsed?: number;
-}
-
-/**
- * The GitKraken notifications inbox. Unless `access` is `'signedIn'`, the rest is empty and nothing polls.
- */
-export interface NotificationsInboxState {
-	/**
-	 * What a surface can show:
-	 * - `'unavailable'` — the feature flag is off; show nothing
-	 * - `'signedOut'` — the flag is on but there's no account, so no inbox; a surface may prompt to sign in
-	 * - `'signedIn'` — the inbox is live (the rest of this state is the signed-in account's)
-	 */
-	readonly access: 'unavailable' | 'signedOut' | 'signedIn';
-	/**
-	 * Opaque; changes whenever the host starts a new inbox (sign-in or an account switch), so a surface
-	 * can drop UI state (failures, fetched-once requests) that belonged to the previous one. `undefined` unless signed in
-	 */
-	readonly inboxId: number | undefined;
-	readonly status: NotificationsStatus;
-	/** Newest first */
-	readonly items: GkNotification[];
-	readonly hasMore: boolean;
-	/** Unread among the loaded items */
-	readonly unreadCount: number;
-	/** `undefined` until fetched (see `getSettings()`) or restored from the cache */
-	readonly settings: NotificationSettings | undefined;
-	/** When the list was last fetched successfully (ms since the epoch) */
-	readonly lastSyncedAt: number | undefined;
-	/**
-	 * A notification to scroll to and focus (a toast's View asked for it). Targets the Settings inbox only — a toast's
-	 * View always opens Settings — which applies it once, then calls `consumeFocus()`. Other surfaces must ignore it
-	 * (and never call `consumeFocus()`), or they'd steal the request from Settings.
-	 */
-	readonly focusNotificationId: string | undefined;
 }
 
 // ============================================================

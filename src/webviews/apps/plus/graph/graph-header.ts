@@ -79,7 +79,6 @@ import '../../shared/components/rich/issue-pull-request.js';
 import '../../shared/components/search/search-box.js';
 import './actions/gitActionsButtons.js';
 import './components/gl-graph-launchpad-indicator.js';
-import './components/gl-graph-notifications-indicator.js';
 import './components/gl-graph-account-indicator.js';
 import './components/gl-graph-header-promo.js';
 import './components/gl-graph-coachmark.js';
@@ -111,6 +110,7 @@ function getSearchResultIdByIndex(results: GraphSearchResults, index: number): s
 
 		if (ids[id].i === index) return id;
 	}
+
 	return undefined;
 }
 
@@ -231,7 +231,9 @@ export class GlGraphHeader extends SignalWatcher(LitElement) {
 	get hasFilters() {
 		// Scope mode forces first-parent rendering, so it always counts as a filter.
 		if (this.graphState.scope != null) return true;
+
 		if (this.graphState.config?.onlyFollowFirstParent) return true;
+
 		if (this.graphState.excludeTypes == null) return false;
 
 		return Object.values(this.graphState.excludeTypes).includes(true);
@@ -316,6 +318,7 @@ export class GlGraphHeader extends SignalWatcher(LitElement) {
 					? l10n.t('Scoped to worktree {0}', this.worktreeDisplayName(scopePath))
 					: l10n.t('Unscoped');
 		}
+
 		this._lastAnnouncedScopePath = scopePath;
 
 		const currentRepoPath = this.graphState.selectedRepository;
@@ -408,6 +411,7 @@ export class GlGraphHeader extends SignalWatcher(LitElement) {
 				}
 			}
 		}
+
 		this.graphState.activeFilterColumns = active;
 	}
 
@@ -517,6 +521,7 @@ export class GlGraphHeader extends SignalWatcher(LitElement) {
 	private getActiveRowInfo(): { date: number; id: string } | undefined {
 		const { activeRow } = this.graphState;
 		if (activeRow == null) return undefined;
+
 		if (this._activeRowInfoCache?.row === activeRow) return this._activeRowInfoCache?.info;
 
 		const index = activeRow.indexOf('|');
@@ -1028,6 +1033,7 @@ export class GlGraphHeader extends SignalWatcher(LitElement) {
 				} catch {
 					break;
 				}
+
 				if (!isCurrent()) return;
 
 				if (
@@ -1420,7 +1426,6 @@ export class GlGraphHeader extends SignalWatcher(LitElement) {
 			<div class="titlebar__group">
 				${this.renderStartMenu()}
 				<gl-graph-launchpad-indicator></gl-graph-launchpad-indicator>
-				<gl-graph-notifications-indicator></gl-graph-notifications-indicator>
 				<gl-graph-account-indicator></gl-graph-account-indicator>
 			</div>
 		</div>`;

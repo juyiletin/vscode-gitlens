@@ -111,6 +111,7 @@ export class GlGraphPreviewBanner extends SignalWatcher(LitElement) {
 			clearInterval(this._refreshInterval);
 			this._refreshInterval = undefined;
 		}
+
 		super.disconnectedCallback?.();
 	}
 
@@ -211,7 +212,7 @@ export class GlGraphPreviewBanner extends SignalWatcher(LitElement) {
 			<span class="strip__actions">
 				<a
 					class="strip__cta"
-					href=${createCommandLink<SubscriptionLoginCommandArgs>('gitlens.plus.login', {
+					href=${createCommandLink<SubscriptionLoginCommandArgs>('gitlens.showSettingsPage!account', {
 						source: 'graph',
 						detail: 'preview-banner',
 						openAccountView: false,

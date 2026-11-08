@@ -10,7 +10,6 @@ export interface Config {
 	readonly autolinks: AutolinkConfig[] | null;
 	readonly blame: BlameConfig;
 	readonly changes: ChangesConfig;
-	readonly cloudPatches: CloudPatchesConfig;
 	readonly codeLens: CodeLensConfig;
 	readonly currentLine: CurrentLineConfig;
 	readonly debug: boolean;
@@ -266,9 +265,6 @@ interface AIConfig {
 	readonly generateStashMessage: {
 		readonly customInstructions: string;
 	};
-	readonly generateCreateCloudPatch: {
-		readonly customInstructions: string;
-	};
 	readonly generateCreatePullRequest: {
 		readonly customInstructions: string;
 	};
@@ -277,9 +273,6 @@ interface AIConfig {
 	};
 	readonly resolveConflicts: {
 		readonly customInstructions: string;
-	};
-	readonly gitkraken: {
-		readonly model: AIProviderAndModel | null;
 	};
 	readonly largePromptWarningThreshold: number;
 	readonly model: SupportedAIModels | null;
@@ -337,13 +330,6 @@ interface BlameConfig {
 interface ChangesConfig {
 	readonly locations: ChangesLocations[];
 	/*readonly*/ toggleMode: AnnotationsToggleMode;
-}
-
-interface CloudPatchesConfig {
-	readonly enabled: boolean;
-	readonly experimental: {
-		readonly layout: 'editor' | 'view';
-	};
 }
 
 export interface CodeLensConfig {
@@ -409,7 +395,6 @@ interface GitCommandsConfig {
 }
 
 interface GitKrakenConfig {
-	readonly activeOrganizationId: string | null;
 	readonly cli: GitKrakenCliConfig;
 	readonly mcp: GitKrakenMcpConfig;
 }
@@ -874,11 +859,9 @@ interface ViewsConfigs {
 	readonly commits: CommitsViewConfig;
 	readonly commitDetails: CommitDetailsViewConfig;
 	readonly contributors: ContributorsViewConfig;
-	readonly drafts: DraftsViewConfig;
 	readonly fileHistory: FileHistoryViewConfig;
 	readonly launchpad: LaunchpadViewConfig;
 	readonly lineHistory: LineHistoryViewConfig;
-	readonly patchDetails: PatchDetailsViewConfig;
 	readonly pullRequest: PullRequestViewConfig;
 	readonly remotes: RemotesViewConfig;
 	readonly repositories: RepositoriesViewConfig;
@@ -895,10 +878,8 @@ export const viewsConfigKeys: ViewsConfigKeys[] = [
 	'commits',
 	'commitDetails',
 	'contributors',
-	'drafts',
 	'fileHistory',
 	'lineHistory',
-	'patchDetails',
 	'pullRequest',
 	'remotes',
 	'repositories',
@@ -968,14 +949,6 @@ export interface ContributorsViewConfig {
 	readonly showStatistics: boolean;
 }
 
-export interface DraftsViewConfig {
-	readonly avatars: boolean;
-	readonly branches: undefined;
-	readonly files: ViewsFilesConfig;
-	readonly pullRequests: undefined;
-	readonly reveal: undefined;
-}
-
 export interface FileHistoryViewConfig {
 	readonly avatars: boolean;
 	readonly files: ViewsFilesConfig;
@@ -999,11 +972,6 @@ export interface LaunchpadViewConfig {
 
 export interface LineHistoryViewConfig {
 	readonly avatars: boolean;
-}
-
-export interface PatchDetailsViewConfig {
-	readonly avatars: boolean;
-	readonly files: ViewsFilesConfig;
 }
 
 export interface PullRequestViewConfig {

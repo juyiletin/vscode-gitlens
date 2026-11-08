@@ -3,7 +3,6 @@ import { suite, test } from 'mocha';
 import type { Issue } from '@gitlens/git/models/issue.js';
 import { fromDisposables } from '@gitlens/utils/disposable.js';
 import { Emitter } from '@gitlens/utils/event.js';
-import { CloudIntegrationService } from '../authentication/cloudIntegrationService.js';
 import { ConfiguredIntegrationService } from '../authentication/configuredIntegrationService.js';
 import { IntegrationAuthenticationService } from '../authentication/integrationAuthenticationService.js';
 import type { ProviderAuthenticationSession } from '../authentication/models.js';
@@ -44,9 +43,8 @@ class TestAsanaIntegration extends AsanaIntegration {
 function createAsana(api: Partial<Pick<ProvidersApi, Extract<keyof ProvidersApi, `getAsana${string}`>>>) {
 	const runtime = createFakeRuntime();
 	const configured = new ConfiguredIntegrationService(runtime);
-	const cloud = new CloudIntegrationService(runtime);
 	let service: IntegrationService;
-	const auth = new IntegrationAuthenticationService(configured, runtime, () => service, cloud);
+	const auth = new IntegrationAuthenticationService(configured, runtime, () => service);
 	service = new IntegrationService(auth, configured, runtime);
 	const providersApi = Object.assign(new ProvidersApi(auth), api);
 	const connectionChange = new Emitter<IntegrationConnectionChangeEvent>();

@@ -89,6 +89,7 @@ function createMocks(opts: {
 	const getUntrackedFiles = sinon.stub().callsFake(async () => {
 		order.push('getUntracked');
 		if (opts.untrackedError != null) throw opts.untrackedError;
+
 		return (opts.untracked ?? []).map(p => ({ path: p }));
 	});
 	const dispose = sinon.stub().callsFake(async () => {
@@ -99,6 +100,7 @@ function createMocks(opts: {
 	const createTemporaryIndex = sinon.stub().callsFake(async () => {
 		order.push('createIndex');
 		if (opts.indexError != null) throw opts.indexError;
+
 		return tempIndex;
 	});
 	const stageFiles = sinon.stub().callsFake(async () => {
@@ -116,6 +118,7 @@ function createMocks(opts: {
 	getDiff.withArgs(uncommitted).callsFake(async () => {
 		order.push('diff:unstaged');
 		if (opts.unstagedError != null) throw opts.unstagedError;
+
 		return opts.unstagedDiff != null ? { contents: opts.unstagedDiff } : undefined;
 	});
 	getDiff.withArgs(uncommittedStaged).callsFake(async () => {
@@ -1174,7 +1177,7 @@ suite('graphInspectServices — resolver effort aggregation', () => {
 /**
  * Prototype-backed fake for the compose conversation lifecycle, in the same shape as
  * {@link createResolveMetricsFake}. Records the `conversationId` each generate/refine was handed and
- * every ID flushed through `AIProviderService.flushBYOKUsage` — together the two observable halves of
+ * the IDs retired from the local conversation registry — together the two observable halves of
  * "one conversation per compose session".
  */
 /** Mirrors what the webview sends: compose is WIP-anchored, so the session key is the WIP anchor's. */
@@ -1183,7 +1186,6 @@ function sessionKeyFor(repoPath: string): ComposeSessionKey {
 }
 
 function createComposeConversationFake(options?: { failGenerate?: boolean }) {
-	const flushed: string[] = [];
 	const regenConversations: (string | undefined)[] = [];
 	const container = {
 		git: {
@@ -1194,10 +1196,6 @@ function createComposeConversationFake(options?: { failGenerate?: boolean }) {
 		},
 		usage: { track: () => Promise.resolve() },
 		ai: {
-			flushBYOKUsage: (conversationId: string) => {
-				flushed.push(conversationId);
-				return Promise.resolve();
-			},
 			actions: {
 				generateCommitMessage: (_patch: unknown, _source: unknown, o?: { conversationId?: string }) => {
 					regenConversations.push(o?.conversationId);
@@ -1227,6 +1225,7 @@ function createComposeConversationFake(options?: { failGenerate?: boolean }) {
 				failNext = false;
 				return Promise.reject(new Error('AI is having a day'));
 			}
+
 			return Promise.resolve(planResult(`key-${++nextKey}`));
 		},
 		refinePlanForGraphDetails: (input: { conversationId: string }) => {
@@ -1285,7 +1284,10 @@ function createComposeConversationFake(options?: { failGenerate?: boolean }) {
 	return {
 		generated: generated,
 		refined: refined,
-		flushed: flushed,
+		get endedConversationIds(): string[] {
+			const active = new Set(fakeThis._composeConversationIds.values());
+			return [...new Set(generated)].filter(id => !active.has(id));
+		},
 		dispose: () => (fakeThis as unknown as { dispose: () => void }).dispose(),
 		// `sessionKey` defaults to the shape the webview actually sends for a compose — every compose is
 		// WIP-anchored, so `wip|<repoPath>`. Tests that care about two sessions on ONE repo pass it.
@@ -1334,7 +1336,7 @@ suite('graphInspectServices — compose conversation lifecycle', () => {
 
 		assert.strictEqual(m.generated.length, 1);
 		assert.strictEqual(m.refined[0], m.generated[0], 'the refine must reuse the generate’s conversation ID');
-		assert.deepStrictEqual(m.flushed, [], 'an ongoing session must not report its usage yet');
+		assert.deepStrictEqual(m.endedConversationIds, [], 'an ongoing session must retain its conversation');
 	});
 
 	test('a cold start while a plan is live abandons that conversation and mints a new one', async () => {
@@ -1347,7 +1349,7 @@ suite('graphInspectServices — compose conversation lifecycle', () => {
 
 		assert.strictEqual(m.generated.length, 2);
 		assert.notStrictEqual(m.generated[1], m.generated[0], 'a fresh compose must not reuse the abandoned ID');
-		assert.deepStrictEqual(m.flushed, [m.generated[0]], 'the abandoned conversation must be flushed exactly once');
+		assert.deepStrictEqual(m.endedConversationIds, [m.generated[0]], 'the abandoned conversation must be retired');
 	});
 
 	test('retrying a generate that failed continues the same conversation', async () => {
@@ -1362,7 +1364,7 @@ suite('graphInspectServices — compose conversation lifecycle', () => {
 
 		assert.strictEqual(m.generated.length, 2);
 		assert.strictEqual(m.generated[1], m.generated[0], 'a retry after failure is the same session');
-		assert.deepStrictEqual(m.flushed, [], 'nothing was abandoned — no plan was ever produced');
+		assert.deepStrictEqual(m.endedConversationIds, [], 'nothing was abandoned — no plan was ever produced');
 	});
 
 	test('regenerating one commit’s message continues the compose session', async () => {
@@ -1378,7 +1380,7 @@ suite('graphInspectServices — compose conversation lifecycle', () => {
 			[m.generated[0]],
 			'the regen must carry the session’s conversation',
 		);
-		assert.deepStrictEqual(m.flushed, [], 'and must not end it — the session is still open');
+		assert.deepStrictEqual(m.endedConversationIds, [], 'and must not end it — the session is still open');
 
 		// Still refinable afterwards, under the same conversation.
 		await m.refine('/repo', key);
@@ -1393,7 +1395,7 @@ suite('graphInspectServices — compose conversation lifecycle', () => {
 
 		await m.discard('/repo', key);
 
-		assert.deepStrictEqual(m.flushed, [m.generated[0]], 'the discarded session must be closed');
+		assert.deepStrictEqual(m.endedConversationIds, [m.generated[0]], 'the discarded session must be closed');
 
 		await composeAndGetKey(m, '/repo');
 		assert.notStrictEqual(m.generated[1], m.generated[0], 'the next compose is a new session');
@@ -1411,7 +1413,7 @@ suite('graphInspectServices — compose conversation lifecycle', () => {
 
 		await m.discard('/repo', undefined);
 
-		assert.deepStrictEqual(m.flushed, [], 'nothing to release, so nothing to end');
+		assert.deepStrictEqual(m.endedConversationIds, [], 'nothing to release, so nothing to end');
 
 		// The retry continues that same conversation, which is what the no-op preserves.
 		await composeAndGetKey(m, '/repo');
@@ -1426,11 +1428,11 @@ suite('graphInspectServices — compose conversation lifecycle', () => {
 		const staleKey = await composeAndGetKey(m, '/repo');
 		await m.discard('/repo', staleKey);
 		const liveKey = await composeAndGetKey(m, '/repo');
-		const flushedBefore = [...m.flushed];
+		const endedBefore = [...m.endedConversationIds];
 
 		await m.discard('/repo', staleKey);
 
-		assert.deepStrictEqual(m.flushed, flushedBefore, 'the live session must be untouched');
+		assert.deepStrictEqual(m.endedConversationIds, endedBefore, 'the live session must be untouched');
 		await m.refine('/repo', liveKey);
 		assert.strictEqual(m.refined.at(-1), m.generated[1], 'and must still be refinable');
 	});
@@ -1441,7 +1443,11 @@ suite('graphInspectServices — compose conversation lifecycle', () => {
 		await m.compose('/repo');
 		await m.apply('/repo');
 
-		assert.deepStrictEqual(m.flushed, [m.generated[0]], 'apply is terminal — the session must report once');
+		assert.deepStrictEqual(
+			m.endedConversationIds,
+			[m.generated[0]],
+			'apply is terminal — the conversation must be retired',
+		);
 
 		await m.compose('/repo');
 
@@ -1465,7 +1471,7 @@ suite('graphInspectServices — compose conversation lifecycle', () => {
 			[m.generated[0], m.generated[1]],
 			'each refine must resume its own repo’s conversation',
 		);
-		assert.deepStrictEqual(m.flushed, [], 'neither session was abandoned by the other');
+		assert.deepStrictEqual(m.endedConversationIds, [], 'neither session was abandoned by the other');
 	});
 
 	test('a refine that fails after swapping the plan lets go of the dead key', async () => {
@@ -1482,13 +1488,13 @@ suite('graphInspectServices — compose conversation lifecycle', () => {
 
 		assert.ok('error' in result, 'the refine should have surfaced the downstream failure');
 		assert.strictEqual(m.trackedKey('/repo'), undefined, 'the dead key must not stay registered');
-		assert.deepStrictEqual(m.flushed, [], 'a retryable failure must not end the session');
+		assert.deepStrictEqual(m.endedConversationIds, [], 'a retryable failure must not end the session');
 
 		// The retry cold-starts, because the plan really is gone — but it continues the same
 		// conversation, since the user is retrying this session rather than abandoning it.
 		await composeAndGetKey(m, '/repo');
 		assert.strictEqual(m.generated[1], m.generated[0], 'the retry must continue the same conversation');
-		assert.deepStrictEqual(m.flushed, [], 'and still not have ended it');
+		assert.deepStrictEqual(m.endedConversationIds, [], 'and still not have ended it');
 	});
 
 	test('two sessions on ONE repo path stay separate', async () => {
@@ -1504,7 +1510,7 @@ suite('graphInspectServices — compose conversation lifecycle', () => {
 		const secondKey = await composeAndGetKey(m, '/repo', multicommitKey);
 
 		assert.notStrictEqual(m.generated[1], m.generated[0], 'the second session must mint its own ID');
-		assert.deepStrictEqual(m.flushed, [], 'neither session abandoned the other');
+		assert.deepStrictEqual(m.endedConversationIds, [], 'neither session abandoned the other');
 
 		await m.refine('/repo', firstKey, sessionKeyFor('/repo'));
 		await m.refine('/repo', secondKey, multicommitKey);
@@ -1516,7 +1522,7 @@ suite('graphInspectServices — compose conversation lifecycle', () => {
 		);
 	});
 
-	test('disposing the panel flushes every conversation still open', async () => {
+	test('disposing the panel releases every active conversation', async () => {
 		// Usage accumulated for an unapplied plan would otherwise be silently dropped on teardown.
 		const m = createComposeConversationFake();
 
@@ -1524,7 +1530,7 @@ suite('graphInspectServices — compose conversation lifecycle', () => {
 		await m.compose('/other');
 		m.dispose();
 
-		assert.deepStrictEqual([...m.flushed].sort(), [...m.generated].sort());
+		assert.deepStrictEqual([...m.endedConversationIds].sort(), [...m.generated].sort());
 	});
 });
 
@@ -1536,18 +1542,12 @@ suite('graphInspectServices — compose conversation lifecycle', () => {
 function createResolveUnavailableFake(opts: {
 	resolutions: { filePath: string; descriptionKind?: string }[];
 	errors: { filePath: string; error: Error }[];
-	role?: 'owner' | 'member';
 }) {
 	const paths = [...opts.resolutions.map(r => r.filePath), ...opts.errors.map(e => e.filePath)];
 	const container = {
 		git: { getRepositoryService: () => ({}) },
 		virtualFs: { registerProvider: () => ({ dispose: () => {} }) },
 		ai: { getModel: async () => ({ id: 'model' }) },
-		subscription: {
-			getSubscription: async () => ({
-				activeOrganization: opts.role != null ? { role: opts.role } : undefined,
-			}),
-		},
 		autoRebase: { getSession: () => undefined },
 	} as unknown as Container;
 
@@ -1646,35 +1646,20 @@ function createSeededHandoffFake(handoff: {
 }
 
 suite('graphInspectServices — AI unavailable during a resolve run', () => {
-	test('a run AI resolved nothing in fails once, with the quota call to action', async () => {
+	test('a run AI resolved nothing in fails once with the provider quota message', async () => {
 		const graphInspect = createResolveUnavailableFake({
 			resolutions: [],
 			errors: ['a.ts', 'b.ts', 'c.ts'].map(p => ({
 				filePath: p,
 				error: new AIError(AIErrorReason.UserQuotaExceeded),
 			})),
-			role: 'owner',
 		});
 
 		const result = await graphInspect.resolveConflicts('/repo', undefined);
 
 		assert.ok('error' in result, `expected a single run-level error: ${JSON.stringify(result)}`);
 		assert.match(result.error.message, /3 files weren’t resolved/);
-		assert.strictEqual(result.error.action, 'purchase-credits');
-	});
-
-	test('a member who can’t buy credits is told to ask an admin, with no purchase action', async () => {
-		const graphInspect = createResolveUnavailableFake({
-			resolutions: [],
-			errors: [{ filePath: 'a.ts', error: new AIError(AIErrorReason.UserQuotaExceeded) }],
-			role: 'member',
-		});
-
-		const result = await graphInspect.resolveConflicts('/repo', undefined);
-
-		assert.ok('error' in result);
-		assert.match(result.error.message, /Contact your organization admin or owner/);
-		assert.strictEqual(result.error.action, undefined);
+		assert.match(result.error.message, /weekly AI usage included in your plan/);
 	});
 
 	test('a partial run keeps its resolutions and reports the reason once, not on every row', async () => {
@@ -1849,6 +1834,7 @@ suite('reviewReading — one graph drives the editor', () => {
 		for (const owner of owners) {
 			releaseReviewFiles(owner);
 		}
+
 		owners = [];
 	});
 
@@ -1929,6 +1915,7 @@ suite('graphInspectServices — two graphs, one editor', () => {
 		for (const fake of fakes) {
 			fake.clearReviewFiles();
 		}
+
 		fakes = [];
 		disposeReviewThreads();
 	});

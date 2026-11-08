@@ -22,8 +22,8 @@ import {
 	showIntegrationRequestTimedOutWarningMessage,
 } from '../../../messages.js';
 import { configuration } from '../../../system/-webview/configuration.js';
-import type { ServerConnection } from '../../gk/serverConnection.js';
-import { createAccountAdapter } from './gkDevFlows.js';
+import { createAccountAdapter } from './accountAdapter.js';
+import { DirectAuthenticationProvider } from './directAuthenticationProvider.js';
 
 /**
  * Builds an {@link IntegrationServiceContext} from the host's `Container`.
@@ -38,14 +38,11 @@ import { createAccountAdapter } from './gkDevFlows.js';
  * VS Code event subscription and `Emitter` the adapters wired up. The host
  * MUST dispose this when tearing down the integration service.
  */
-export function createIntegrationServiceContext(
-	container: Container,
-	connection: ServerConnection,
-): IntegrationServiceContext & VsCodeDisposable {
+export function createIntegrationServiceContext(container: Container): IntegrationServiceContext & VsCodeDisposable {
 	const disposables: VsCodeDisposable[] = [];
 	const ctx: IntegrationServiceContext = {
 		storage: createStorageAdapter(container),
-		account: createAccountAdapter(container, connection, disposables),
+		account: createAccountAdapter(disposables),
 		config: createConfigAdapter(disposables),
 		http: createHttpAdapter(container),
 		cache: container.cache,
@@ -143,6 +140,28 @@ function createStorageAdapter(container: Container): IntegrationStorageProvider 
 
 function createIntegrationServiceHooks(container: Container): IntegrationServiceHooks {
 	return {
+		createAuthenticationProvider: ({ id }) => Promise.resolve(new DirectAuthenticationProvider(container, id)),
+		requestIntegrationDomain: async id =>
+			await window.showInputBox({
+				title: l10n.t('Connect to {0}', id),
+				prompt: l10n.t('Enter the server URL for {0}.', id),
+				ignoreFocusOut: true,
+				validateInput: value => {
+					try {
+						const url = new URL(value.includes('://') ? value : `https://${value}`);
+						if (
+							(url.protocol === 'https:' || url.protocol === 'http:') &&
+							!url.username &&
+							!url.password &&
+							url.hostname
+						) {
+							return undefined;
+						}
+					} catch {}
+
+					return l10n.t('Enter a valid server URL.');
+				},
+			}),
 		onReauthenticationRequired: async message => {
 			const confirm = { title: l10n.t('Reauthenticate') };
 			return (await window.showErrorMessage(message, confirm)) === confirm;

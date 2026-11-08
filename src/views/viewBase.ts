@@ -27,7 +27,6 @@ import type {
 	BranchesViewConfig,
 	CommitsViewConfig,
 	ContributorsViewConfig,
-	DraftsViewConfig,
 	FileHistoryViewConfig,
 	LaunchpadViewConfig,
 	LineHistoryViewConfig,
@@ -60,7 +59,6 @@ import { getViewFocusCommand } from '../system/-webview/vscode/views.js';
 import type { BranchesView } from './branchesView.js';
 import type { CommitsView } from './commitsView.js';
 import type { ContributorsView } from './contributorsView.js';
-import type { DraftsView } from './draftsView.js';
 import type { FileHistoryView } from './fileHistoryView.js';
 import type { LaunchpadView } from './launchpadView.js';
 import type { LineHistoryView } from './lineHistoryView.js';
@@ -107,7 +105,6 @@ export type View =
 	| BranchesView
 	| CommitsView
 	| ContributorsView
-	| DraftsView
 	| FileHistoryView
 	| LaunchpadView
 	| LineHistoryView
@@ -128,8 +125,6 @@ export type TreeViewByType = {
 		? CommitsView
 		: T extends 'contributors'
 		? ContributorsView
-		: T extends 'drafts'
-		? DraftsView
 		: T extends 'fileHistory'
 		? FileHistoryView
 		: T extends 'launchpad'
@@ -161,8 +156,6 @@ export type WebviewViewByType = {
 		? CommitsView
 		: T extends 'graph'
 		? CommitsView
-		: T extends 'patchDetails'
-		? CommitsView
 		: T extends 'timeline'
 		? CommitsView
 		: View;
@@ -179,7 +172,7 @@ export type ViewsWithRepositories = RepositoriesView | WorkspacesView;
 export type ViewsWithRepositoriesNode = RepositoriesView | WorkspacesView;
 export type ViewsWithRepositoryFolders = Exclude<
 	View,
-	DraftsView | FileHistoryView | LaunchpadView | LineHistoryView | PullRequestView | RepositoriesView | WorkspacesView
+	FileHistoryView | LaunchpadView | LineHistoryView | PullRequestView | RepositoriesView | WorkspacesView
 >;
 export type ViewsWithStashes = StashesView | ViewsWithCommits;
 export type ViewsWithStashesNode = RepositoriesView | StashesView | WorkspacesView;
@@ -206,7 +199,6 @@ export abstract class ViewBase<
 		| BranchesViewConfig
 		| CommitsViewConfig
 		| ContributorsViewConfig
-		| DraftsViewConfig
 		| FileHistoryViewConfig
 		| LaunchpadViewConfig
 		| LineHistoryViewConfig
@@ -432,6 +424,7 @@ export abstract class ViewBase<
 		) {
 			return false;
 		}
+
 		if (this.is('contributors') && !configuration.get('views.contributors.showAllBranches')) return false;
 
 		return true;
@@ -441,6 +434,7 @@ export abstract class ViewBase<
 		if (!configuration.changed(e, 'views')) return false;
 
 		if (configuration.changed(e, `views.${this.configKey}` as const)) return true;
+
 		if (
 			configuration.changed(
 				e,
@@ -613,6 +607,7 @@ export abstract class ViewBase<
 			this.tree = window.createTreeView<ViewNode>(this.id, { ...options, treeDataProvider: this });
 			this.disposables.push(this.tree);
 		}
+
 		this._defaultSelection = [];
 
 		this.disposables.push(
@@ -635,9 +630,11 @@ export abstract class ViewBase<
 		} else {
 			this._title = this.tree.title;
 		}
+
 		if (this._description != null && !this.grouped) {
 			this.tree.description = this._description;
 		}
+
 		if (this._message != null) {
 			this.tree.message = this._message;
 		}
@@ -746,6 +743,7 @@ export abstract class ViewBase<
 			} else if (index > 0) {
 				header = children.splice(index, 1)[0];
 			}
+
 			if (header != null) {
 				this._defaultSelection = this.grouped ? [header] : [];
 				children.unshift(header);
@@ -981,6 +979,7 @@ export abstract class ViewBase<
 			}
 
 			if (predicate(node)) return node;
+
 			if (canTraverse != null) {
 				const traversable = canTraverse(node);
 				if (isPromise(traversable)) {
@@ -1300,8 +1299,6 @@ function getGroupedViewDescription(type: TreeViewTypes, count: number | undefine
 			return count != null ? l10n.t('commits ({0})', String(count)) : l10n.t('commits');
 		case 'contributors':
 			return count != null ? l10n.t('contributors ({0})', String(count)) : l10n.t('contributors');
-		case 'drafts':
-			return count != null ? l10n.t('cloud patches ({0})', String(count)) : l10n.t('cloud patches');
 		case 'fileHistory':
 			return count != null ? l10n.t('file history ({0})', String(count)) : l10n.t('file history');
 		case 'launchpad':

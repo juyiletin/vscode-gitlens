@@ -3,25 +3,18 @@ import { gate } from '@gitlens/utils/decorators/gate.js';
 import { debug } from '@gitlens/utils/decorators/log.js';
 import type { Disposable } from '@gitlens/utils/disposable.js';
 import type { IntegrationIds, SupportedCloudIntegrationIds } from '../constants.js';
-import {
-	GitCloudHostIntegrationId,
-	GitSelfManagedHostIntegrationId,
-	IssuesCloudHostIntegrationId,
-	IssuesSelfManagedHostIntegrationId,
-} from '../constants.js';
 import type { IntegrationServiceContext } from '../context.js';
 import type { IntegrationService } from '../integrationService.js';
 import type { GitHostIntegration } from '../models/gitHostIntegration.js';
 import type { ApiClients } from '../providers/apiClients.js';
 import type { Source } from '../telemetry.js';
 import { isSelfManagedHostIntegrationId, supportedIntegrationIds } from '../utils/integration.utils.js';
-import type { CloudIntegrationService } from './cloudIntegrationService.js';
 import type { ConfiguredIntegrationService } from './configuredIntegrationService.js';
 import type {
 	IntegrationAuthenticationProvider,
 	IntegrationAuthenticationSessionDescriptor,
 } from './integrationAuthenticationProvider.js';
-import { CloudIntegrationAuthenticationProvider } from './integrationAuthenticationProvider.js';
+import { HostIntegrationAuthenticationProvider } from './integrationAuthenticationProvider.js';
 import { ObservedAuthenticationProvider } from './observedAuthenticationProvider.js';
 
 export class IntegrationAuthenticationService implements Disposable {
@@ -36,8 +29,6 @@ export class IntegrationAuthenticationService implements Disposable {
 		 * mutable setter or a host round-trip; only resolved at runtime (long after construction).
 		 */
 		private readonly getIntegrationService: () => IntegrationService,
-		/** The package's cloud token-exchange client, constructed by the composition root. */
-		readonly cloudIntegrations: CloudIntegrationService,
 	) {}
 
 	dispose(): void {
@@ -45,11 +36,7 @@ export class IntegrationAuthenticationService implements Disposable {
 		this.providers.clear();
 	}
 
-	/**
-	 * Initiates the cloud-integration connect flow on the owning service. Cloud auth providers call
-	 * this when they need a session that doesn't exist yet (see
-	 * {@link CloudIntegrationAuthenticationProvider}).
-	 */
+	/** Initiates the direct integration connect flow on the owning service. */
 	connectCloudIntegrations(
 		connect: { integrationIds: SupportedCloudIntegrationIds[]; skipIfConnected?: boolean; skipPreSync?: boolean },
 		source?: Source,
@@ -96,24 +83,7 @@ export class IntegrationAuthenticationService implements Disposable {
 	}
 
 	supports(providerId: string): boolean {
-		// Linear, Trello and Asana are cloud-backed issue integrations (same as Jira): `ensureProvider` registers a
-		// cloud auth provider for them, so a disconnect must offer to sign out of the cloud token too —
-		// otherwise the backend token and configured connection survive the disable.
-		switch (providerId) {
-			case GitCloudHostIntegrationId.AzureDevOps:
-			case GitSelfManagedHostIntegrationId.AzureDevOpsServer:
-			case GitCloudHostIntegrationId.Bitbucket:
-			case GitCloudHostIntegrationId.GitLab:
-			case IssuesCloudHostIntegrationId.Jira:
-			case IssuesSelfManagedHostIntegrationId.JiraServer:
-			case IssuesCloudHostIntegrationId.Linear:
-			case IssuesCloudHostIntegrationId.Trello:
-			case IssuesCloudHostIntegrationId.Asana:
-			case GitCloudHostIntegrationId.GitHub:
-				return true;
-			default:
-				return false;
-		}
+		return supportedIntegrationIds.some(id => id === providerId);
 	}
 
 	@gate()
@@ -121,47 +91,29 @@ export class IntegrationAuthenticationService implements Disposable {
 		let provider = this.providers.get(providerId);
 		if (provider != null) return provider;
 
-		// Optional consumer override for custom auth (e.g. a manual-token provider). GitLens omits it —
-		// the package constructs its own cloud providers below (so GitLens's cloud auth needs no host hook).
+		// The host resolves credentials; persisted providers also use the package's connection storage.
 		const hostProvider = await this.ctx.hooks?.createAuthenticationProvider?.({
 			id: providerId,
 		});
 		if (hostProvider != null) {
-			provider = new ObservedAuthenticationProvider(
-				hostProvider,
-				isSelfManagedHostIntegrationId(providerId),
-				(publication, domains) =>
-					this.getIntegrationService().onSessionPublishing(providerId, publication, domains),
-			);
+			provider = hostProvider.persistSessions
+				? new HostIntegrationAuthenticationProvider(
+						this,
+						this.configuredIntegrationService,
+						providerId,
+						hostProvider,
+					)
+				: new ObservedAuthenticationProvider(
+						hostProvider,
+						isSelfManagedHostIntegrationId(providerId),
+						(publication, domains) =>
+							this.getIntegrationService().onSessionPublishing(providerId, publication, domains),
+					);
 			this.providers.set(providerId, provider);
 			return provider;
 		}
 
-		// Every cloud integration shares one provider, parameterized by id (cloud-only).
-		switch (providerId) {
-			case GitCloudHostIntegrationId.GitHub:
-			case GitSelfManagedHostIntegrationId.CloudGitHubEnterprise:
-			case GitCloudHostIntegrationId.GitLab:
-			case GitSelfManagedHostIntegrationId.CloudGitLabSelfHosted:
-			case GitCloudHostIntegrationId.AzureDevOps:
-			case GitSelfManagedHostIntegrationId.AzureDevOpsServer:
-			case GitCloudHostIntegrationId.Bitbucket:
-			case GitSelfManagedHostIntegrationId.BitbucketServer:
-			case IssuesCloudHostIntegrationId.Jira:
-			case IssuesSelfManagedHostIntegrationId.JiraServer:
-			case IssuesCloudHostIntegrationId.Linear:
-			case IssuesCloudHostIntegrationId.Trello:
-			case IssuesCloudHostIntegrationId.Asana:
-				provider = new CloudIntegrationAuthenticationProvider(
-					this,
-					this.configuredIntegrationService,
-					providerId,
-				);
-				break;
-			default:
-				throw new Error(`No authentication provider registered for integration '${String(providerId)}'`);
-		}
-
+		provider = new HostIntegrationAuthenticationProvider(this, this.configuredIntegrationService, providerId);
 		this.providers.set(providerId, provider);
 		return provider;
 	}

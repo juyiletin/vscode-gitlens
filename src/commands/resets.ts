@@ -2,7 +2,6 @@ import type { MessageItem } from 'vscode';
 import { l10n, window } from 'vscode';
 import { resetApprovedAvatarTemplates, resetAvatarCache } from '../avatars.js';
 import type { Container } from '../container.js';
-import { clearTrialResetSessionAttempts } from '../plus/gk/trialAutoReset.js';
 import type { QuickPickItemOfT } from '../quickpicks/items/common.js';
 import { createQuickPickSeparator } from '../quickpicks/items/common.js';
 import { settingsMigrations } from '../settingsMigrations.js';
@@ -14,7 +13,6 @@ const resetTypes = [
 	'ai',
 	'ai:models',
 	'avatars',
-	'cli',
 	'integrations',
 	'migrations',
 	'onboarding',
@@ -52,13 +50,6 @@ export class ResetCommand extends GlCommandBase {
 					'Clears the stored avatar cache and any approvals granted to custom remote avatar URL templates',
 				),
 				item: 'avatars',
-			},
-			{
-				label: l10n.t('GitKraken CLI (Installation)...'),
-				detail: l10n.t(
-					"Removes the downloaded CLI and clears its install state, so it's reinstalled when next needed",
-				),
-				item: 'cli',
 			},
 			{
 				label: l10n.t('Integrations (Authentication)...'),
@@ -156,12 +147,6 @@ export class ResetCommand extends GlCommandBase {
 					'This is IRREVERSIBLE!\nAre you sure you want to reset the avatar cache and all approvals for custom remote avatar URL templates? Approvals are synced, so this will affect your other devices.',
 				);
 				confirm.title = l10n.t('Reset Avatars');
-				break;
-			case 'cli':
-				confirmationMessage = l10n.t(
-					'This is IRREVERSIBLE!\nAre you sure you want to reset the GitKraken CLI installation?',
-				);
-				confirm.title = l10n.t('Reset GitKraken CLI');
 				break;
 			case 'integrations':
 				confirmationMessage = l10n.t(
@@ -268,10 +253,6 @@ export class ResetCommand extends GlCommandBase {
 				resetAvatarCache('all');
 				break;
 
-			case 'cli':
-				await this.container.gkCli?.reset();
-				break;
-
 			case 'integrations':
 				await this.container.integrations.reset();
 				break;
@@ -352,13 +333,13 @@ export class ResetCommand extends GlCommandBase {
 							await this.container.storage.delete('premium:subscription');
 							await this.container.storage.deleteWithPrefix('plus:trialReset');
 							await this.container.storage.deleteWithPrefix('plus:trialReactivation');
-							clearTrialResetSessionAttempts();
 							break;
 						case 'previews':
 							await this.container.storage.deleteWithPrefix('plus:preview');
 							break;
 					}
 				}
+
 				break;
 		}
 	}

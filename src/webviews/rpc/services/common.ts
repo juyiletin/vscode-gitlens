@@ -6,7 +6,6 @@
  * sub-services should import individual classes directly instead.
  *
  */
-
 import type { Container } from '../../../container.js';
 import type { EventVisibilityBuffer, SubscriptionTracker } from '../eventVisibilityBuffer.js';
 import { PromosService } from '../promosService.js';
@@ -104,7 +103,7 @@ export function createSharedServices(
 		telemetry: new TelemetryService(host, updateTelemetryContext, container.usage, buffer, tracker),
 		files: new FilesService(container),
 		pullRequests: new PullRequestsService(container),
-		drafts: new DraftsService(container, host),
+		drafts: new DraftsService(container),
 		webview: new WebviewViewService(host, buffer, tracker),
 	};
 }
